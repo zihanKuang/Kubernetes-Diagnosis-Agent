@@ -32,13 +32,24 @@ class Scenario:
     expected_tools: List[str] = field(default_factory=list)
     # Relative to infra/chaos/. None = do not inject anything.
     manifest: Optional[str] = None
+    # Inject this first, wait, delete it, then apply `manifest`.
+    pre_manifest: Optional[str] = None
+    pre_wait_seconds: int = 0
     wait_seconds: int = 0
     notes: str = ""
+    # If these phrases appear together with a kill verb, flag stale-event mix.
+    # Does not flip root_cause_hit by itself.
+    stale_if: List[str] = field(default_factory=list)
 
     def manifest_path(self) -> Optional[Path]:
         if not self.manifest:
             return None
         return _CHAOS_DIR / self.manifest
+
+    def pre_manifest_path(self) -> Optional[Path]:
+        if not self.pre_manifest:
+            return None
+        return _CHAOS_DIR / self.pre_manifest
 
 
 SCENARIOS: List[Scenario] = [
@@ -84,9 +95,32 @@ SCENARIOS: List[Scenario] = [
 ]
 
 
+# Not in the default catalog. Measures the OBJECT-column iteration:
+# leftover frontend kill events sit next to a fresh checkout kill.
+STALE_TRAP = Scenario(
+    id="checkout-after-frontend",
+    query=(
+        "What just happened to the checkout pods in citrus? "
+        "Short RCA, then validate_recovery."
+    ),
+    must_contain=["checkout"],
+    must_contain_any=["kill", "killed", "terminat", "deleted", "chaos"],
+    expected_tools=["get_recent_events", "validate_recovery"],
+    pre_manifest="pod-kill-frontend.yaml",
+    pre_wait_seconds=20,
+    manifest="pod-kill-checkout.yaml",
+    wait_seconds=25,
+    stale_if=["frontend"],
+    notes=(
+        "Inject frontend kill, drop the CR, then checkout kill. "
+        "Hit = named checkout. stale_mix = treated leftover frontend as this incident."
+    ),
+)
+
+
 def scenario_by_id(scenario_id: str) -> Scenario:
-    for scenario in SCENARIOS:
+    for scenario in [*SCENARIOS, STALE_TRAP]:
         if scenario.id == scenario_id:
             return scenario
-    known = ", ".join(s.id for s in SCENARIOS)
+    known = ", ".join(s.id for s in [*SCENARIOS, STALE_TRAP])
     raise KeyError(f"unknown scenario {scenario_id!r}. known: {known}")
