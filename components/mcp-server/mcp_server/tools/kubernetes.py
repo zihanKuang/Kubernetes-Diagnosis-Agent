@@ -402,17 +402,28 @@ class KubernetesTools:
             rows.sort(key=lambda r: r[0])
             # Cap output to keep context small; newest last
             rows = rows[-40:]
-            lines = [
-                f"Events in last {minutes}m (namespace={self.namespace}):",
-                "NOTE: Events are correlated by the OBJECT column, not by timestamp "
-                "proximity alone. Events for different objects (e.g. different pod "
-                "names) may be unrelated even if they occur seconds apart -- this "
-                "commonly happens when a previous experiment/resource is deleted "
-                "right before a new one is created.",
-                "TIME\tTYPE\tREASON\tOBJECT\tMESSAGE",
-            ]
-            for ts, evt_type, reason, obj_ref, message in rows:
-                lines.append(f"{ts.isoformat()}\t{evt_type}\t{reason}\t{obj_ref}\t{message}")
+            legacy = os.getenv("CITRUS_ABLATION", "").strip().lower() == "legacy"
+            if legacy:
+                lines = [
+                    f"Events in last {minutes}m (namespace={self.namespace}):",
+                    "TIME\tTYPE\tREASON\tMESSAGE",
+                ]
+                for ts, evt_type, reason, _obj_ref, message in rows:
+                    lines.append(f"{ts.isoformat()}\t{evt_type}\t{reason}\t{message}")
+            else:
+                lines = [
+                    f"Events in last {minutes}m (namespace={self.namespace}):",
+                    "NOTE: Events are correlated by the OBJECT column, not by timestamp "
+                    "proximity alone. Events for different objects (e.g. different pod "
+                    "names) may be unrelated even if they occur seconds apart -- this "
+                    "commonly happens when a previous experiment/resource is deleted "
+                    "right before a new one is created.",
+                    "TIME\tTYPE\tREASON\tOBJECT\tMESSAGE",
+                ]
+                for ts, evt_type, reason, obj_ref, message in rows:
+                    lines.append(
+                        f"{ts.isoformat()}\t{evt_type}\t{reason}\t{obj_ref}\t{message}"
+                    )
             return "\n".join(lines)
 
         except subprocess.CalledProcessError as e:

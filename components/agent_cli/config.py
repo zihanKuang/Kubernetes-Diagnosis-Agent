@@ -8,7 +8,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-from .prompts import DEFAULT_SRE_SYSTEM_INSTRUCTION
+from .prompts import DEFAULT_SRE_SYSTEM_INSTRUCTION, LEGACY_SRE_SYSTEM_INSTRUCTION
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _PACKAGE_DIR.parent.parent
@@ -92,6 +92,9 @@ class AgentConfig:
         env_mem_path = os.getenv("CITRUS_MEMORY_PATH")
         if env_mem_path:
             self.memory_path = env_mem_path
+
+        if os.getenv("CITRUS_ABLATION", "").strip().lower() == "legacy":
+            self.system_instruction = LEGACY_SRE_SYSTEM_INSTRUCTION
 
     @classmethod
     def from_env(cls) -> "AgentConfig":
