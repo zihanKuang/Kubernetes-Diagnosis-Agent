@@ -52,9 +52,31 @@ class Score:
     tools_used: Dict[str, int] = field(default_factory=dict)
     errors: int = 0
     answer_body: str = ""
+    stale_mix: bool = False
+    stale_hits: List[str] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+_KILL = ("kill", "killed", "killing", "terminat", "deleted", "chaos")
+_PRIOR = ("earlier", "previous", "prior", "history", "stale", "already recovered", "note:")
+
+
+def _stale_mix(scenario: Scenario, hay: str) -> List[str]:
+    if not scenario.stale_if:
+        return []
+    if not any(k in hay for k in _KILL):
+        return []
+    hits = []
+    for marker in scenario.stale_if:
+        if marker.lower() not in hay:
+            continue
+        # Mentioning leftover as labeled history is allowed.
+        if any(p in hay for p in _PRIOR):
+            continue
+        hits.append(marker)
+    return hits
 
 
 def score(scenario: Scenario, answer: str, stats: Dict[str, Any]) -> Score:
@@ -65,6 +87,7 @@ def score(scenario: Scenario, answer: str, stats: Dict[str, Any]) -> Score:
     any_hits = _hits(scenario.must_contain_any, hay)
     missing_any = [] if (not scenario.must_contain_any or any_hits) else list(scenario.must_contain_any)
     forbidden_hits = _hits(scenario.must_not_contain, hay)
+    stale_hits = _stale_mix(scenario, hay)
 
     hit = not missing_required and not missing_any and not forbidden_hits
 
@@ -93,4 +116,6 @@ def score(scenario: Scenario, answer: str, stats: Dict[str, Any]) -> Score:
         tools_used=tools_used,
         errors=int(stats.get("errors") or 0),
         answer_body=body,
+        stale_mix=bool(stale_hits),
+        stale_hits=stale_hits,
     )

@@ -90,7 +90,25 @@ def test_checkout_kill_does_not_pass_on_a_frontend_story():
     assert "checkout" in result.missing_required
 
 
-def test_missing_expected_tool_is_reported_but_is_not_a_root_cause_miss():
+def test_stale_mix_flags_unlabeled_frontend_in_checkout_story():
+    from agent_cli.eval_scenarios import STALE_TRAP
+
+    answer = "Chaos Mesh killed a frontend pod. Checkout is also involved."
+    result = score(STALE_TRAP, answer, _stats())
+    assert result.root_cause_hit is True
+    assert result.stale_mix is True
+
+
+def test_stale_mix_allows_labeled_prior_history():
+    from agent_cli.eval_scenarios import STALE_TRAP
+
+    answer = (
+        "Chaos Mesh killed a checkout pod. "
+        "Note: an earlier frontend kill cycle was already recovered."
+    )
+    result = score(STALE_TRAP, answer, _stats())
+    assert result.root_cause_hit is True
+    assert result.stale_mix is False
     scenario = scenario_by_id("pod-kill-frontend")
     answer = "Chaos Mesh killed a frontend pod. It is back."
     result = score(scenario, answer, _stats({"list_pods": 1, "get_recent_events": 1}))
