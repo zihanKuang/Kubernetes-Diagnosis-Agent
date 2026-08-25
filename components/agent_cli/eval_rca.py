@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import time
@@ -22,7 +23,7 @@ from typing import Iterable, List
 
 from .agent import ReActAgent
 from .config import AgentConfig
-from .eval_scenarios import SCENARIOS, Scenario, scenario_by_id
+from .eval_scenarios import SCENARIOS, STALE_TRAP, Scenario, scenario_by_id
 from .eval_score import Score, score
 from .memory import annotate_latest_hit
 
@@ -41,10 +42,7 @@ def _kubectl(*args: str) -> subprocess.CompletedProcess:
     )
 
 
-def _inject(scenario: Scenario) -> None:
-    path = scenario.manifest_path()
-    if path is None:
-        return
+def _apply_manifest(path: Path, wait_seconds: int, label: str) -> None:
     if not path.exists():
         raise FileNotFoundError(f"chaos manifest missing: {path}")
     delete = _kubectl("delete", "-f", str(path), "--ignore-not-found")
@@ -54,15 +52,30 @@ def _inject(scenario: Scenario) -> None:
     apply = _kubectl("apply", "-f", str(path))
     if apply.returncode != 0:
         raise RuntimeError(apply.stderr or apply.stdout)
-    print(f"  injected {path.name}, waiting {scenario.wait_seconds}s...")
-    time.sleep(scenario.wait_seconds)
+    print(f"  injected {label} ({path.name}), waiting {wait_seconds}s...")
+    time.sleep(wait_seconds)
+
+
+def _inject(scenario: Scenario) -> None:
+    pre = scenario.pre_manifest_path()
+    if pre is not None:
+        _apply_manifest(pre, scenario.pre_wait_seconds, "pre")
+        _kubectl("delete", "-f", str(pre), "--ignore-not-found")
+        time.sleep(3)
+    path = scenario.manifest_path()
+    if path is None:
+        return
+    _inject_wait = scenario.wait_seconds
+    _apply_manifest(path, _inject_wait, "main")
 
 
 def _cleanup(scenario: Scenario) -> None:
     path = scenario.manifest_path()
-    if path is None:
-        return
-    _kubectl("delete", "-f", str(path), "--ignore-not-found")
+    if path is not None:
+        _kubectl("delete", "-f", str(path), "--ignore-not-found")
+    pre = scenario.pre_manifest_path()
+    if pre is not None:
+        _kubectl("delete", "-f", str(pre), "--ignore-not-found")
 
 
 def _print_score(result: Score) -> None:
@@ -75,6 +88,8 @@ def _print_score(result: Score) -> None:
         print(f"    needed one of: {result.missing_any}")
     if result.forbidden_hits:
         print(f"    forbidden phrases: {result.forbidden_hits}")
+    if result.stale_mix:
+        print(f"    stale_mix: {result.stale_hits}")
     if result.expected_tools_missing:
         print(f"    expected tools not called: {result.expected_tools_missing}")
 
@@ -241,6 +256,7 @@ async def _run_scenarios(
     _save(out_dir, results, extra={
         "memory_enabled": memory_enabled,
         "memory_path": str(memory_path) if memory_path else None,
+        "ablation": os.getenv("CITRUS_ABLATION") or "current",
     })
     return results
 
@@ -254,6 +270,17 @@ def main() -> None:
     parser.add_argument("--skip-inject", action="store_true", help="Do not apply/delete Chaos Mesh")
     parser.add_argument("--no-cleanup", action="store_true", help="Leave the Chaos CR in the cluster")
     parser.add_argument("--out-dir", type=Path, default=_DEFAULT_OUT)
+    parser.add_argument(
+        "--stale-trap",
+        action="store_true",
+        help="Run checkout-after-frontend (leftover frontend events + fresh checkout kill)",
+    )
+    parser.add_argument(
+        "--ablation",
+        choices=["current", "legacy"],
+        default="current",
+        help="current = OBJECT column + correlation prompt; legacy = strip both",
+    )
     parser.add_argument(
         "--no-memory",
         action="store_true",
@@ -296,13 +323,18 @@ def main() -> None:
             print("\nCatalog order is the run order. healthy-baseline is first on purpose.")
         return
 
-    if args.scenario:
+    if args.stale_trap:
+        chosen = [STALE_TRAP]
+    elif args.scenario:
         chosen = [scenario_by_id(args.scenario)]
     elif args.all:
         chosen = list(SCENARIOS)
     else:
         parser.print_help()
         sys.exit(1)
+
+    os.environ["CITRUS_ABLATION"] = "legacy" if args.ablation == "legacy" else ""
+    print(f"ablation={args.ablation or 'current'}  CITRUS_ABLATION={os.environ.get('CITRUS_ABLATION')!r}")
 
     asyncio.run(_run_scenarios(
         chosen,

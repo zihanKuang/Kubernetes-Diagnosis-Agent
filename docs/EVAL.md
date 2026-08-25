@@ -64,6 +64,48 @@ not a memory effect.
 Honest line for a resume: **n=3 上未见可归因于记忆的提升**. One-tool movement
 on a single scenario is noise.
 
+## Live rerun + OBJECT ablation (2026-08-21, DeepSeek, memory off)
+
+Cluster still had `frontend-proxy` crash-looping (~2616 restarts). Leftover
+Chaos Mesh events from earlier runs were in the 10-minute window.
+
+### Kill scenarios (the number that belongs on a resume)
+
+| condition | frontend kill | checkout kill | evidence | duration_s |
+|-----------|---------------|---------------|----------|------------|
+| current (OBJECT + correlation prompt) | HIT | HIT | HIGH | 8.32 / 6.81 |
+| legacy (no OBJECT column, no correlation rules) | HIT | HIT | HIGH | 8.66 / 7.37 |
+
+**2/2** on injected pod-kills either way. Ceiling is already the phrase hit.
+
+### Cross-contamination (`checkout-after-frontend`)
+
+Inject frontend kill, delete the CR, then inject checkout kill. Ask only about checkout.
+
+| condition | hit | stale_mix | duration_s | tools |
+|-----------|-----|-----------|------------|-------|
+| current | HIT | false | 11.28 | 4 |
+| legacy | HIT | false | 11.72 | 5 |
+
+n=1: both named checkout; neither treated leftover frontend as *this* incident.
+Current answer cited `Pod/checkout-…` from the OBJECT column and matched
+`list_pods`. That is a quality difference, not a hit-rate lift. Do **not** write
+“OBJECT 使命中率提升”.
+
+### Catalog `healthy-baseline`
+
+Current run **MISS** because the body contained `PodChaos` (forbidden phrase)
+while correctly separating recovered chaos from the real `frontend-proxy`
+crash-loop. Legacy **HIT** by avoiding that token. The miss is a scorer artifact,
+not a worse RCA. Do not quote today’s catalog as 3/3 or as a regression.
+
+```powershell
+python -m agent_cli.eval_rca --stale-trap --no-memory --ablation current
+python -m agent_cli.eval_rca --stale-trap --no-memory --ablation legacy
+python -m agent_cli.eval_rca --all --no-memory --ablation current
+python -m agent_cli.eval_rca --all --no-memory --ablation legacy
+```
+
 ## What the numbers mean
 
 - **root-cause hit**: phrase check on the answer *body* (the evidence footer is stripped).
