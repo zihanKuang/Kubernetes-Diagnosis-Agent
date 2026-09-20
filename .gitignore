@@ -17,9 +17,8 @@ node_modules/
 .env
 citrus-template/*
 
-# Private interview notes / audits (keep a tracked README only)
-.docs/*
-!.docs/README.md
+# Local notes (not published)
+.docs/
 
 # Scratch
 scripts/.mess/
