@@ -16,6 +16,7 @@ node_modules/
 citrus-template/*
 
 .docs/*
+scripts/.mess
 
 # RCA eval runs (generated)
 data/eval/
