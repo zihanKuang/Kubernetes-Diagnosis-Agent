@@ -3,6 +3,7 @@
 # Python
 __pycache__/
 *.py[cod]
+.pytest_cache/
 venv/
 .venv/
 *.egg-info/
@@ -12,13 +13,18 @@ node_modules/
 .vscode/
 .idea/
 
+# Secrets and local templates
 .env
 citrus-template/*
 
+# Private interview notes / audits (keep a tracked README only)
 .docs/*
-scripts/.mess
+!.docs/README.md
 
-# RCA eval runs (generated)
+# Scratch
+scripts/.mess/
+
+# Runtime artifacts (eval runs, memory, webhook degrade log)
 data/eval/
 data/memory/
 data/audit/
