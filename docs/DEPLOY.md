@@ -5,9 +5,8 @@ cluster over Streamable HTTP, with least-privilege RBAC and a real
 verification pass (not just "trust me, it's secure").
 
 For the shorter chaos-injection demo path, see [DEMO.md](DEMO.md). This guide
-is the deeper one: it's what you run once to stand the in-cluster MCP server
-up, and what you'd walk an interviewer through if they asked "how do you know
-the AI can't do something dangerous?"
+stands up the in-cluster MCP server and checks that RBAC, not the model,
+blocks dangerous writes.
 
 ## Prerequisites
 
@@ -42,7 +41,7 @@ docker images | findstr mcp-server
 ```
 
 The base image is `python:3.12-slim`, not distroless — see
-[README design notes](../README.md#design-notes-interview-talking-points) for
+[README design notes](../README.md#design-decisions--trade-offs) for
 why that trade-off was made. Don't expect a sub-100MB image; slim + the
 `kubernetes`/`mcp` Python deps land in the low hundreds of MB, which is still
 far smaller than a full `python:3.12` image.
@@ -227,11 +226,11 @@ shouldn't. Re-check `infra/rbac/mcp-server-rbac.yaml` only has
 
 ---
 
-## Step 8: Manual Verification (the interview demo)
+## Step 8: Manual verification
 
-Same idea as Step 7, done live and narrated: "I intentionally tried to delete
-a pod through this ServiceAccount to prove RBAC — not the agent's own
-judgment — is what stops it."
+Same checks as Step 7, run from the MCP pod. The delete is expected to fail
+because the ServiceAccount Role has no write verbs — not because the agent
+refused.
 
 ```bash
 $POD_NAME = kubectl get pods -n citrus -l app=mcp-server -o jsonpath='{.items[0].metadata.name}'
@@ -261,25 +260,6 @@ except ApiException as e:
 - `/health` responds over the port-forwarded Service
 - `rbac-test-pod.yaml`: all 5 checks PASS
 - Manual delete attempt: blocked with 403
-
----
-
-## Interview Talking Points
-
-**Security architecture**
-> "The MCP server runs under a dedicated ServiceAccount with a namespace-scoped Role — get/list/watch only. It can read pod logs and events for diagnostics, but delete/create/patch are not in the Role at all, so even a hallucinated destructive tool call gets a 403 straight from the Kubernetes API, before it ever reaches my code."
-
-**Image trade-off, not a clean win**
-> "I built this as distroless first for the smaller attack surface, but `pydantic_core`'s native extension couldn't initialize without a shell/libc present in the image, so it crash-looped. I fell back to `python:3.12-slim` + non-root UID + `readOnlyRootFilesystem` + all capabilities dropped. It's not distroless, but it's still a meaningfully reduced surface, and I can explain exactly why I didn't go further."
-
-**In-cluster identity**
-> "The Pod uses in-cluster config, not a mounted personal kubeconfig — Kubernetes injects a ServiceAccount token scoped to exactly the Role I defined, and it auto-rotates."
-
-**Streamable HTTP, not stdio, in-cluster**
-> "Locally the agent just spawns the MCP server as a stdio subprocess — fastest iteration loop. In-cluster, stdio doesn't make sense (nothing to spawn it as a child of), so I run Streamable HTTP behind a ClusterIP Service, gated by a Bearer token Secret and a NetworkPolicy that only allows same-namespace ingress — no public Ingress at all."
-
-**Verification, not assertion**
-> "I don't just claim it's read-only — `rbac-test-pod.yaml` runs under the same ServiceAccount and actively tries to delete and create pods. If those ever stopped returning 403, that test would fail and tell me immediately."
 
 ---
 

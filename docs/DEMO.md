@@ -1,4 +1,4 @@
-# local demo
+# Local demo
 
 Cluster must be running (`kubectl get ns citrus` works). If not, start Kubernetes first, then deploy.
 
@@ -14,11 +14,15 @@ Expect otel-demo + monitoring pods Running (may take several minutes).
 ## B. Agent (stdio) smoke test
 
 ```powershell
+# First run: install packages (after this, you can run from any directory)
 cd components
-# one-time in this venv (if you see No module named mcp / agent_cli):
-#   pip install -e ".[test]"
-#   pip install -e "mcp-server[test]"
-# agent_cli/.env with DEEPSEEK_API_KEY=
+pip install -e ".[test]"
+pip install -e "mcp-server[test]"
+
+# Configure agent_cli/.env (required):
+#   DEEPSEEK_API_KEY=sk-your-key-here
+
+# Smoke the agent
 python -m agent_cli "List pods in citrus and summarize unhealthy ones."
 ```
 
@@ -36,15 +40,63 @@ cd components
 python -m agent_cli "What just happened to the frontend pods in citrus? Short RCA, then validate_recovery."
 ```
 
-Cleanup:
+Cleanup (deletes the PodChaos resource in the cluster; the YAML file stays):
 
 ```powershell
 kubectl delete -f infra/chaos/pod-kill-frontend.yaml
 ```
 
-Labeled eval (healthy baseline + frontend kill + checkout kill): [EVAL.md](EVAL.md).
+## E. Labeled eval
 
-## D. Optional HTTP MCP
+Run the automated eval on 3 scenarios (healthy baseline + frontend kill + checkout kill):
+
+```powershell
+# List scenarios (no cluster required)
+python -m agent_cli.eval_rca --list
+
+# Dry run (does not execute)
+python -m agent_cli.eval_rca --dry-run
+
+# Full eval (needs cluster + Chaos Mesh + DEEPSEEK_API_KEY)
+# First: no-memory baseline
+python -m agent_cli.eval_rca --all --no-memory
+
+# Second: memory on (agent reads postmortems)
+python -m agent_cli.eval_rca --all
+
+# Compare the two runs
+python -m agent_cli.eval_rca --compare data\eval\rca_eval_<timestamp1>.json data\eval\rca_eval_<timestamp2>.json
+```
+
+Details: [EVAL.md](EVAL.md).
+
+## F. Webhook (Alertmanager)
+
+Start the webhook HTTP server so Alertmanager can trigger RCA:
+
+```powershell
+# Option 1: env var
+$env:CITRUS_WEBHOOK_TOKEN="change-me-webhook-secret"
+python -m agent_cli.webhook --port 9093
+
+# Option 2: flag
+python -m agent_cli.webhook --port 9093 --token "change-me-webhook-secret"
+
+# Exercise the webhook from another terminal
+curl -X POST http://localhost:9093/webhook `
+  -H "Authorization: Bearer change-me-webhook-secret" `
+  -H "Content-Type: application/json" `
+  -d '@infra/alerting/sample-alert.json'
+```
+
+The webhook:
+
+- checks the token (idempotency + rate limit)
+- runs the agent for RCA
+- publishes only HIGH/MEDIUM evidence
+- degrades by saving the raw payload if the agent fails
+
+## G. Optional HTTP MCP
 
 ```powershell
 cd components\mcp-server

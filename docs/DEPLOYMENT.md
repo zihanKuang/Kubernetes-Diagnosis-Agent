@@ -36,10 +36,10 @@ Complete deployment guide for Citrus-Orchestrator monitoring platform with OpenT
 
 ```powershell
 # Step 1: Deploy infrastructure layer
-.\scripts\deploy-infrastructure.ps1
+.\scripts\deployment\1-deploy-infrastructure.ps1
 
 # Step 2: Deploy application layer
-.\scripts\deploy-application.ps1
+.\scripts\deployment\2-deploy-application.ps1
 ```
 
 ### Option 2: Manual Deployment

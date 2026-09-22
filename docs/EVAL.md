@@ -61,7 +61,7 @@ tools because the previous eval's Killing events were still in the 15-minute
 window, and that scenario starts with an empty JSONL — so the extra work is
 not a memory effect.
 
-Honest line for a resume: **n=3 上未见可归因于记忆的提升**. One-tool movement
+Honest line for a resume: **no attributable lift from memory on n=3**. One-tool movement
 on a single scenario is noise.
 
 ## Live rerun + OBJECT ablation (2026-08-21, DeepSeek, memory off)
@@ -90,7 +90,7 @@ Inject frontend kill, delete the CR, then inject checkout kill. Ask only about c
 n=1: both named checkout; neither treated leftover frontend as *this* incident.
 Current answer cited `Pod/checkout-…` from the OBJECT column and matched
 `list_pods`. That is a quality difference, not a hit-rate lift. Do **not** write
-“OBJECT 使命中率提升”.
+that OBJECT correlation improved hit rate.
 
 ### Catalog `healthy-baseline`
 
