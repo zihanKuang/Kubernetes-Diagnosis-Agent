@@ -1,0 +1,12 @@
+{
+  "syntax": {
+    "enabled": true,
+    "extensions": [".py"]
+  },
+  "test": {
+    "enabled": false,
+    "cwd": "components",
+    "argv": ["python", "-m", "pytest", "agent_cli/tests", "mcp-server/tests", "-q", "--tb=line"],
+    "why": "Only this block is project-specific. record.py / verify_stop.py / hooklib.py can be copied as-is."
+  }
+}
