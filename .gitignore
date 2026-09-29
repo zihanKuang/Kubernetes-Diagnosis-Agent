@@ -24,6 +24,9 @@ citrus-template/*
 # Scratch
 scripts/.mess/
 
+# Cursor hook runtime. Scripts under .cursor/hooks/ stay tracked.
+.cursor/hooks/state/
+
 # Runtime artifacts (eval runs, memory, webhook degrade log)
 data/eval/
 data/memory/
