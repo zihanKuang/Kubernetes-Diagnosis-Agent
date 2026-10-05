@@ -26,7 +26,7 @@ def test_compare_reports_no_lift_when_hits_and_tools_flat():
     assert cmp["hits_baseline"] == "3/3"
     assert cmp["hits_current"] == "3/3"
     assert cmp["scenarios_with_fewer_tools"] == 0
-    assert "未见提升" in cmp["verdict"]
+    assert "no lift" in cmp["verdict"]
 
 
 def test_compare_notices_fewer_tools():
