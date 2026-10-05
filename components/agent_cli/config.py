@@ -29,6 +29,12 @@ class AgentConfig:
     model_name: str = "deepseek-v4-flash"
     api_key: Optional[str] = None
     llm_base_url: str = "https://api.deepseek.com"
+    # "deepseek" (hosted default) or "vllm" / any OpenAI-compatible server.
+    llm_provider: str = "deepseek"
+    llm_timeout_seconds: float = 120.0
+    llm_max_concurrency: int = 4
+    # DeepSeek can take 8k; Colab T4 vLLM is served at max_model_len=4096.
+    llm_max_tokens: int = 8192
     system_instruction: str = DEFAULT_SRE_SYSTEM_INSTRUCTION
 
     mcp_server_command: str = field(default_factory=lambda: sys.executable)
@@ -57,16 +63,43 @@ class AgentConfig:
     writes_interactive: Optional[bool] = None
 
     def __post_init__(self):
-        if self.api_key is None:
-            self.api_key = os.getenv("DEEPSEEK_API_KEY")
+        env_provider = os.getenv("CITRUS_LLM_PROVIDER")
+        if env_provider:
+            self.llm_provider = env_provider.strip().lower()
 
-        env_base = os.getenv("DEEPSEEK_BASE_URL")
+        if self.api_key is None:
+            self.api_key = os.getenv("CITRUS_LLM_API_KEY") or os.getenv("DEEPSEEK_API_KEY")
+        if self.api_key is None and self.llm_provider != "deepseek":
+            # Self-hosted OpenAI-compatible servers (vLLM without --api-key)
+            # ignore the key, but the openai client requires a non-empty one.
+            self.api_key = "EMPTY"
+
+        # CITRUS_LLM_* wins; DEEPSEEK_* / MODEL_NAME kept as fallback.
+        env_base = os.getenv("CITRUS_LLM_BASE_URL") or os.getenv("DEEPSEEK_BASE_URL")
         if env_base:
             self.llm_base_url = env_base
 
-        env_model = os.getenv("MODEL_NAME")
+        env_model = os.getenv("CITRUS_LLM_MODEL") or os.getenv("MODEL_NAME")
         if env_model:
             self.model_name = env_model
+
+        env_llm_timeout = os.getenv("CITRUS_LLM_TIMEOUT_SECONDS")
+        if env_llm_timeout:
+            self.llm_timeout_seconds = float(env_llm_timeout)
+
+        env_llm_concurrency = os.getenv("CITRUS_LLM_MAX_CONCURRENCY")
+        if env_llm_concurrency:
+            self.llm_max_concurrency = int(env_llm_concurrency)
+
+        env_llm_max_tokens = os.getenv("CITRUS_LLM_MAX_TOKENS")
+        if env_llm_max_tokens:
+            self.llm_max_tokens = int(env_llm_max_tokens)
+        elif self.llm_provider != "deepseek":
+            # Stay under typical self-hosted --max-model-len 4096.
+            # Tool dumps (list_pods of a full namespace) eat the prompt; keep
+            # completion short and truncate tool output aggressively.
+            self.llm_max_tokens = 256
+            self.max_content_length = 800
 
         if self.mcp_server_cwd is None:
             self.mcp_server_cwd = str(_MCP_SERVER_DIR)
@@ -98,8 +131,5 @@ class AgentConfig:
 
     @classmethod
     def from_env(cls) -> "AgentConfig":
-        return cls(
-            model_name=os.getenv("MODEL_NAME", "deepseek-v4-flash"),
-            api_key=os.getenv("DEEPSEEK_API_KEY"),
-            max_steps=int(os.getenv("MAX_STEPS", "10")),
-        )
+        # model/provider/api_key env handling lives in __post_init__.
+        return cls(max_steps=int(os.getenv("MAX_STEPS", "10")))

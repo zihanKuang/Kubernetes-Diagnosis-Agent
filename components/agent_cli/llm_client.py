@@ -1,18 +1,31 @@
 """
-LLM client (DeepSeek via the OpenAI-compatible Chat Completions API).
+Model client for any OpenAI-compatible Chat Completions endpoint.
 
-Agent messages stay in OpenAI shape. This module only talks to the HTTP API
-and normalizes tool-call arguments to dicts for mcp_client.call_tool.
+Providers: DeepSeek (hosted, default) and vLLM / other self-hosted
+OpenAI-compatible servers. The agent stays provider-agnostic: messages are
+OpenAI-shaped, and switching providers is a config/env change, not a code
+change (CITRUS_LLM_PROVIDER / CITRUS_LLM_BASE_URL / CITRUS_LLM_MODEL).
+
+Reliability lives here, outside the ReAct loop:
+  - concurrency semaphore (protects a small self-hosted endpoint),
+  - per-request timeout (asyncio.wait_for),
+  - bounded retries with exponential backoff + jitter (retry_utils),
+  - Prometheus metrics per attempt (latency, tokens, failures).
 """
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Optional
 
 from .exceptions import LLMError
 from .logging_utils import log_llm_debug, log_llm_error
+from .metrics import add_llm_tokens, inc_llm_failure, observe_llm_request
+from .retry_utils import get_retry_delay
 
 DEFAULT_BASE_URL = "https://api.deepseek.com"
+DEFAULT_PROVIDER = "deepseek"
 
 
 def _import_openai():
@@ -87,53 +100,153 @@ def messages_for_api(
     return out
 
 
-class LLMClient:
+def retryable_reason(error: Exception) -> Optional[str]:
+    """Reason label if the error is worth retrying, else None (fatal)."""
+    if isinstance(error, asyncio.TimeoutError):
+        return "timeout"
+    status = getattr(error, "status_code", None)
+    if isinstance(status, int):
+        if status == 429:
+            return "rate_limited"
+        if status >= 500:
+            return "server_error"
+        return None
+    try:
+        from openai import APIConnectionError
+
+        if isinstance(error, APIConnectionError):
+            return "connection"
+    except ImportError:  # pragma: no cover - openai is a hard dependency
+        if isinstance(error, ConnectionError):
+            return "connection"
+    return None
+
+
+class ModelClient:
+    """Provider-agnostic chat client with timeout, retry, and concurrency cap."""
+
     def __init__(
         self,
         model_name: str,
         api_key: str,
         system_instruction: str = "",
         base_url: str = DEFAULT_BASE_URL,
+        provider: str = DEFAULT_PROVIDER,
+        timeout_seconds: float = 120.0,
+        max_concurrency: int = 4,
+        max_retries: int = 3,
+        base_retry_delay_ms: int = 500,
+        max_retry_delay_ms: int = 32000,
+        retry_jitter_factor: float = 0.25,
+        max_tokens: int = 8192,
     ):
         self.model_name = model_name
         self.api_key = api_key
         self.system_instruction = system_instruction
         self.base_url = base_url.rstrip("/")
+        self.provider = (provider or DEFAULT_PROVIDER).strip().lower()
+        self.timeout_seconds = timeout_seconds
+        self.max_retries = max(1, int(max_retries))
+        self.base_retry_delay_ms = base_retry_delay_ms
+        self.max_retry_delay_ms = max_retry_delay_ms
+        self.retry_jitter_factor = retry_jitter_factor
+        self.max_tokens = max(1, int(max_tokens))
+        self._semaphore = asyncio.Semaphore(max(1, int(max_concurrency)))
         self._client = None
 
     def _ensure_client(self):
         if self._client is not None:
             return
         if not self.api_key:
-            raise LLMError("DEEPSEEK_API_KEY is not set")
+            raise LLMError(
+                "LLM API key is not set (set CITRUS_LLM_API_KEY, or DEEPSEEK_API_KEY "
+                "for the default DeepSeek provider; self-hosted vLLM accepts EMPTY)"
+            )
         AsyncOpenAI = _import_openai()
         self._client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
-        log_llm_debug(f"DeepSeek client ready: {self.model_name} @ {self.base_url}")
+        log_llm_debug(
+            f"Model client ready: provider={self.provider} model={self.model_name} @ {self.base_url}"
+        )
+
+    def _request_kwargs(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: List[Dict[str, Any]],
+        tool_choice: str | None = None,
+    ) -> Dict[str, Any]:
+        kwargs: Dict[str, Any] = {
+            "model": self.model_name,
+            "messages": messages_for_api(messages, self.system_instruction),
+            "temperature": 0.2,
+            "max_tokens": self.max_tokens,
+        }
+        if self.provider == "deepseek":
+            # DeepSeek-only knob. Non-thinking: cheaper, and ReAct already
+            # does the reasoning loop. vLLM would reject this extra_body.
+            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+        if tools:
+            kwargs["tools"] = tools
+            if tool_choice:
+                kwargs["tool_choice"] = tool_choice
+        return kwargs
 
     async def generate_with_tools(
         self,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
+        tool_choice: str | None = None,
     ) -> Dict[str, Any]:
-        try:
-            self._ensure_client()
-            kwargs: Dict[str, Any] = {
-                "model": self.model_name,
-                "messages": messages_for_api(messages, self.system_instruction),
-                "temperature": 0.2,
-                "max_tokens": 8192,
-                # Non-thinking: cheaper, and ReAct already does the reasoning loop.
-                "extra_body": {"thinking": {"type": "disabled"}},
-            }
-            if tools:
-                kwargs["tools"] = tools
-            response = await self._client.chat.completions.create(**kwargs)
-            return self._parse_response(response)
-        except LLMError:
-            raise
-        except Exception as e:
-            log_llm_error("LLM generation failed", error=e)
-            raise LLMError(f"LLM generation failed: {e}", original_error=e)
+        self._ensure_client()
+        kwargs = self._request_kwargs(messages, tools, tool_choice=tool_choice)
+        last_error: Optional[Exception] = None
+
+        for attempt in range(1, self.max_retries + 1):
+            start = time.monotonic()
+            try:
+                async with self._semaphore:
+                    response = await asyncio.wait_for(
+                        self._client.chat.completions.create(**kwargs),
+                        timeout=self.timeout_seconds,
+                    )
+            except Exception as e:
+                elapsed = time.monotonic() - start
+                reason = retryable_reason(e)
+                observe_llm_request(self.provider, self.model_name, "error", elapsed)
+                inc_llm_failure(self.provider, self.model_name, reason or "fatal")
+                if reason is None:
+                    log_llm_error("LLM generation failed", error=e)
+                    raise LLMError(f"LLM generation failed: {e}", original_error=e)
+                last_error = e
+                if attempt < self.max_retries:
+                    delay = get_retry_delay(
+                        attempt=attempt,
+                        base_delay_ms=self.base_retry_delay_ms,
+                        max_delay_ms=self.max_retry_delay_ms,
+                        jitter_factor=self.retry_jitter_factor,
+                    )
+                    log_llm_error(
+                        f"LLM {reason}, retrying in {delay:.2f}s "
+                        f"(attempt {attempt}/{self.max_retries})",
+                        error=e,
+                    )
+                    await asyncio.sleep(delay)
+            else:
+                elapsed = time.monotonic() - start
+                observe_llm_request(self.provider, self.model_name, "ok", elapsed)
+                usage = getattr(response, "usage", None)
+                if usage is not None:
+                    add_llm_tokens(
+                        self.provider,
+                        self.model_name,
+                        prompt=getattr(usage, "prompt_tokens", 0) or 0,
+                        completion=getattr(usage, "completion_tokens", 0) or 0,
+                    )
+                return self._parse_response(response)
+
+        raise LLMError(
+            f"LLM request failed after {self.max_retries} attempts: {last_error}",
+            original_error=last_error,
+        )
 
     def _parse_response(self, response) -> Dict[str, Any]:
         try:
@@ -154,3 +267,7 @@ class LLMClient:
                 }
             )
         return result
+
+
+# Backwards-compatible alias (pre-vLLM name).
+LLMClient = ModelClient

@@ -17,7 +17,8 @@ from .memory import (
     format_prefix,
     retrieve,
 )
-from .llm_client import LLMClient
+from .llm_client import ModelClient
+from .metrics import inc_agent_run, inc_tool_call
 from .retry_utils import get_retry_delay
 from .logging_utils import log_agent_debug, log_agent_info, log_agent_error
 from .exceptions import (
@@ -48,11 +49,19 @@ class ReActAgent:
                 cwd=config.mcp_server_cwd,
                 timeout_seconds=config.tool_timeout_seconds,
             )
-        self.llm_client = LLMClient(
+        self.llm_client = ModelClient(
             model_name=config.model_name,
             api_key=config.api_key,
             system_instruction=config.system_instruction,
             base_url=config.llm_base_url,
+            provider=config.llm_provider,
+            timeout_seconds=config.llm_timeout_seconds,
+            max_concurrency=config.llm_max_concurrency,
+            max_retries=config.max_retries,
+            base_retry_delay_ms=config.base_retry_delay_ms,
+            max_retry_delay_ms=config.max_retry_delay_ms,
+            retry_jitter_factor=config.retry_jitter_factor,
+            max_tokens=config.llm_max_tokens,
         )
 
         self.messages: List[Dict[str, Any]] = []
@@ -151,6 +160,7 @@ class ReActAgent:
 
         check = assess(user_query, result, self.stats)
         self.last_check = check
+        inc_agent_run(check.level)
         log_agent_info(f"Evidence check: {check.level}")
         stamped = attach_footer(result, check)
 
@@ -185,9 +195,13 @@ class ReActAgent:
             log_agent_info(f"{'='*80}")
             
             try:
+                # Small / self-hosted models skip the OpenAI tool-call schema and
+                # dump XML instead. Until we have live evidence, require a tool.
+                force_tools = self.tools and not (self.stats.get("tool_calls") or {})
                 response = await self.llm_client.generate_with_tools(
                     messages=self.messages,
-                    tools=self.tools
+                    tools=self.tools,
+                    tool_choice="required" if force_tools else None,
                 )
             except LLMError as e:
                 log_agent_error("LLM error", error=e)
@@ -205,7 +219,20 @@ class ReActAgent:
             if not final_answer:
                 log_agent_error("LLM returned empty response")
                 continue
-            
+
+            if not (self.stats.get("tool_calls") or {}) and step < self.config.max_steps - 1:
+                log_agent_info("Rejected ungrounded final answer (0 tool calls); retrying")
+                self.messages.append({"role": "assistant", "content": final_answer})
+                self.messages.append({
+                    "role": "user",
+                    "content": (
+                        "Rejected: you answered without calling any MCP tools. "
+                        "Call list_pods first, then get_recent_events / get_pod_logs "
+                        "as needed. Do not invent cluster state."
+                    ),
+                })
+                continue
+
             log_agent_info(f"\nFinal Answer:\n{final_answer}")
             return final_answer
         
@@ -254,6 +281,7 @@ class ReActAgent:
                     })
                     self.stats["tool_calls"][tool_name] = \
                         self.stats["tool_calls"].get(tool_name, 0) + 1
+                    inc_tool_call(tool_name, "denied")
                     log_agent_info(f"  <- gated write blocked: {denied}")
                     continue
             
@@ -288,11 +316,14 @@ class ReActAgent:
         
         for attempt in range(self.config.max_retries):
             try:
-                return await self.mcp_client.call_tool(tool_name, arguments)
+                result = await self.mcp_client.call_tool(tool_name, arguments)
+                inc_tool_call(tool_name, "ok")
+                return result
                 
             except ToolNotFoundError as e:
                 log_agent_error("Tool not found", error=e)
                 self.stats["errors"] += 1
+                inc_tool_call(tool_name, "error")
                 return f"ERROR: {str(e)}"
             
             except ToolTimeoutError as e:
@@ -312,16 +343,19 @@ class ReActAgent:
                 else:
                     log_agent_error(f"Tool timeout after {self.config.max_retries} attempts")
                     self.stats["errors"] += 1
+                    inc_tool_call(tool_name, "error")
                     return f"ERROR: Tool timed out after {self.config.max_retries} attempts"
             
             except ToolExecutionError as e:
                 log_agent_error("Tool execution error", error=e)
                 self.stats["errors"] += 1
+                inc_tool_call(tool_name, "error")
                 return f"ERROR: {str(e)}"
             
             except Exception as e:
                 log_agent_error("Unexpected error during tool execution", error=e)
                 self.stats["errors"] += 1
+                inc_tool_call(tool_name, "error")
                 return f"ERROR: Unexpected error: {str(e)}"
         
         return f"ERROR: Max retries exceeded. Last error: {last_error}"
