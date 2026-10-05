@@ -55,6 +55,14 @@ async def main():
         default=None,
         help="Streamable HTTP MCP endpoint (default: local stdio)",
     )
+
+    parser.add_argument(
+        "--engine",
+        choices=["react", "langgraph"],
+        default="react",
+        help="Orchestration engine: hand-written ReAct loop (default) or "
+             "LangGraph StateGraph (same tools/harness, needs the langgraph extra)",
+    )
     
     args = parser.parse_args()
     
@@ -68,14 +76,24 @@ async def main():
         config.model_name = args.model
 
     if not config.api_key:
-        print("Error: DEEPSEEK_API_KEY environment variable not set")
+        print("Error: no LLM API key configured")
         print("\nSet it with:")
         print("  copy agent_cli\\.env.example agent_cli\\.env")
-        print("  then put your key in DEEPSEEK_API_KEY=")
+        print("  then put your key in DEEPSEEK_API_KEY= (hosted default)")
+        print("  or point at a self-hosted server via CITRUS_LLM_PROVIDER=vllm")
+        print("  + CITRUS_LLM_BASE_URL= + CITRUS_LLM_MODEL=")
         sys.exit(1)
     
     # Create and initialize agent
-    agent = ReActAgent(config)
+    if args.engine == "langgraph":
+        try:
+            from .engine_langgraph import LangGraphAgent
+            agent = LangGraphAgent(config)
+        except ImportError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+    else:
+        agent = ReActAgent(config)
     
     try:
         await agent.initialize()
