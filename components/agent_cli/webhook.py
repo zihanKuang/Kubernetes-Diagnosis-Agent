@@ -23,6 +23,7 @@ from .agent import ReActAgent
 from .config import AgentConfig
 from .eval_score import split_answer
 from .evidence import assess
+from .metrics import render as render_metrics
 from .topology import ServiceGraph
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -333,6 +334,15 @@ def _make_handler(app: WebhookApp):
             path = urlparse(self.path).path
             if path in {"/", "/healthz"}:
                 self._send(200, {"ok": True})
+                return
+            if path == "/metrics":
+                # Prometheus scrape endpoint (agent runtime metrics).
+                data, content_type = render_metrics()
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
                 return
             self._send(404, {"error": "not found"})
 

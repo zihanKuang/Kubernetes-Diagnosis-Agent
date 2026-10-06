@@ -1,0 +1,119 @@
+{
+  "dashboard": {
+    "title": "Citrus Agent - LLM & Tool Runtime",
+    "tags": ["citrus", "agent", "llm", "observability"],
+    "timezone": "browser",
+    "editable": true,
+    "graphTooltip": 1,
+    "panels": [
+      {
+        "title": "Agent Runs by Evidence Level",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(citrus_agent_runs_total) by (evidence)",
+            "legendFormat": "{{evidence}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0
+          }
+        }
+      },
+      {
+        "title": "LLM Inference Latency P50 / P95 (per attempt)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(citrus_llm_request_seconds_bucket[5m])) by (le, provider, model))",
+            "legendFormat": "P50 {{provider}}/{{model}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(citrus_llm_request_seconds_bucket[5m])) by (le, provider, model))",
+            "legendFormat": "P95 {{provider}}/{{model}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Latency"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "LLM Request Rate by Outcome",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(citrus_llm_request_seconds_count[5m])) by (outcome, provider)",
+            "legendFormat": "{{outcome}} ({{provider}})",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "LLM Failures by Reason (5m rate)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "sum(rate(citrus_llm_failures_total[5m])) by (reason)",
+            "legendFormat": "{{reason}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Failures/s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Token Throughput (prompt vs completion)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "sum(rate(citrus_llm_tokens_total[5m])) by (kind, model)",
+            "legendFormat": "{{kind}} ({{model}})",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Tokens/s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "MCP Tool Calls (1h) by Tool and Outcome",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "sum(increase(citrus_tool_calls_total[1h])) by (tool, outcome)",
+            "legendFormat": "{{tool}} ({{outcome}})",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Calls"},
+          {"format": "short"}
+        ]
+      }
+    ],
+    "time": {"from": "now-1h", "to": "now"},
+    "refresh": "30s",
+    "schemaVersion": 39,
+    "version": 1
+  },
+  "overwrite": true
+}
