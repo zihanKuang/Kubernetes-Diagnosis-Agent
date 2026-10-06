@@ -1,8 +1,0 @@
-﻿# MCP Client
-mcp>=1.0.0,<2
-
-# DeepSeek (OpenAI-compatible API)
-openai>=1.0.0
-
-# Utils
-python-dotenv>=1.0.0
