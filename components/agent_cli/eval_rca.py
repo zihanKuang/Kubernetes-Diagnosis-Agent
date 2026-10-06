@@ -165,7 +165,7 @@ def compare_runs(baseline: dict, current: dict) -> dict:
         if isinstance(r["delta_tool_calls"], int) and r["delta_tool_calls"] < 0
     )
     verdict = (
-        "n=3 上未见提升"
+        "no lift on n=3"
         if hits_c <= hits_b and fewer_tools == 0
         else "hit rate or tool-call count moved — see rows"
     )
