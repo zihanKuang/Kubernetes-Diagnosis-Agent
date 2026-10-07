@@ -71,6 +71,10 @@ grafana:
 prometheus:
   enabled: true
   prometheusSpec:
+    # Accept OTLP/HTTP metrics pushed by the OpenTelemetry Collector.
+    # The Collector uses /api/v1/otlp as its base URL and appends /v1/metrics.
+    enableOTLPReceiver: true
+
     # CRITICAL: Allow Prometheus to discover ServiceMonitors in all namespaces
     # Without this, application metrics won't be scraped
     serviceMonitorSelectorNilUsesHelmValues: false

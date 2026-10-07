@@ -18,6 +18,11 @@ prometheus:
 grafana:
   enabled: false
 
+# Disable the demo's bundled log backend. Logs stay on the Collector debug
+# exporter in this local setup; enabling OpenSearch costs about 1 CPU / 1.1GiB.
+opensearch:
+  enabled: false
+
 # ========================================
 # OPENTELEMETRY COLLECTOR CONFIGURATION
 # Configure OTel Collector to send data to our existing infrastructure
@@ -25,10 +30,22 @@ grafana:
 
 opentelemetry-collector:
   enabled: true
+
+  # The processor below starts protecting the process near 400 MiB. Keep the
+  # cgroup limit above that threshold so Kubernetes does not OOMKill it first.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   
   config:
     # Receivers: How services send data to the collector
     receivers:
+      kubeletstats:
+        insecure_skip_verify: true
       otlp:
         protocols:
           grpc:
@@ -100,7 +117,7 @@ components:
     enabled: true
     service:
       type: ClusterIP
-    env:
+    envOverrides:
       # Point frontend to our Jaeger UI
       - name: JAEGER_HOST
         value: jaeger

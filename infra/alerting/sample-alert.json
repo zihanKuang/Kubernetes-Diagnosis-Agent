@@ -1,0 +1,40 @@
+{
+  "receiver": "citrus-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PodCrashLooping",
+        "namespace": "citrus",
+        "service": "frontend",
+        "severity": "critical",
+        "component": "frontend"
+      },
+      "annotations": {
+        "summary": "Pod frontend is crash-looping",
+        "description": "Pod frontend in namespace citrus has been restarting frequently"
+      },
+      "startsAt": "2026-08-25T21:00:00.000Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph?g0.expr=..."
+    }
+  ],
+  "groupLabels": {
+    "alertname": "PodCrashLooping",
+    "namespace": "citrus"
+  },
+  "commonLabels": {
+    "alertname": "PodCrashLooping",
+    "namespace": "citrus",
+    "service": "frontend",
+    "severity": "critical"
+  },
+  "commonAnnotations": {
+    "summary": "Pod frontend is crash-looping"
+  },
+  "externalURL": "http://alertmanager:9093",
+  "version": "4",
+  "groupKey": "{}/{namespace=\"citrus\"}:{alertname=\"PodCrashLooping\", namespace=\"citrus\"}",
+  "truncatedAlerts": 0
+}

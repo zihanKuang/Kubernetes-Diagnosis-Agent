@@ -11,7 +11,7 @@ Chaos kill → K8s self-heal → Agent RCA + recovery validation
 Local Kubernetes platform for progressive delivery, observability, and Agentic SRE diagnostics.
 
 Workload: [OpenTelemetry Demo](https://github.com/open-telemetry/opentelemetry-demo) (Helm).  
-Ops layer (this repo): monitoring stack, canary tooling, MCP server, hand-written ReAct agent CLI, Chaos Mesh demos.
+Ops layer (this repo): monitoring stack, MCP server, hand-written ReAct agent CLI, Chaos Mesh demos.
 
 ## What this repo is
 
@@ -19,7 +19,6 @@ Ops layer (this repo): monitoring stack, canary tooling, MCP server, hand-writte
 |-------|------|--------|
 | Target app | otel-demo microservices | `deploy/helm/otel-demo-values.yaml` |
 | Observability | Prometheus, Grafana, Jaeger + agent runtime `/metrics` | `deploy/helm/*`, `deploy/grafana/`, `components/agent_cli/metrics.py` |
-| Canary / MLOps | metric-based deploy + rollback | `scripts/canary/` |
 | MCP server | K8s/Prometheus tools over MCP | `components/mcp-server/` |
 | Agent CLI | hand-written ReAct loop + hard evidence stamp | `components/agent_cli/` |
 | Model serving | provider-agnostic `ModelClient` (DeepSeek hosted / self-hosted vLLM) | `components/agent_cli/llm_client.py`, `docs/VLLM.md` |
@@ -241,8 +240,7 @@ Citrus-Orchestrator/
 │   └── rbac/                   # read-only Role for MCP SA
 ├── scripts/
 │   ├── deployment/             # PowerShell IaC
-│   ├── canary/                 # metric-based deploy + rollback
-│   └── tests/                  # bats + load_test_llm.py
+│   └── tests/                  # load_test_llm.py
 ├── docs/                       # public English docs (index in docs/README.md)
 ├── data/                       # runtime artifacts (gitignored)
 └── README.md
