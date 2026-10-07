@@ -1,0 +1,31 @@
+---
+description: Prefer simple, explicit code a new teammate can read on the first pass
+alwaysApply: true
+---
+
+# Human-readable code
+
+Prefer simple and explicit code.
+
+Optimize for human readability, not cleverness or minimum line count.
+
+Avoid:
+- unnecessary abstraction layers
+- wrapper functions that add no semantic value
+- premature generalization
+- deeply nested conditionals
+- excessive defensive checks
+- verbose names when a shorter precise name exists
+- comments that merely describe what the code does
+
+Prefer:
+- early returns
+- descriptive domain-oriented names
+- locality of behavior
+- straightforward control flow
+- existing project conventions
+- small abstractions only when they remove real complexity
+
+Code should be understandable by a developer reading it for the first time.
+
+Do not mix a readability refactor into a feature or bugfix. After the change works and existing tests pass, a separate pass can use the code-simplification skill.
