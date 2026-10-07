@@ -45,7 +45,9 @@ async def list_tools() -> list[Tool]:
             name="list_pods",
             description=(
                 f"List all pods in the '{NAMESPACE}' namespace with phase, readiness, "
-                "restart counts, and component labels. "
+                "restart counts, and component labels. Unhealthy pods add a state "
+                "field (CrashLoopBackOff, ImagePullBackOff, OOMKilled, RunningNotReady, "
+                "Unschedulable). Healthy Running pods omit it. "
                 "Use this first during incident triage. "
                 f"Namespace is fixed to {NAMESPACE}."
             ),
@@ -86,8 +88,11 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="get_pod_status",
             description=(
-                f"Get status for pods in '{NAMESPACE}' matching a label selector "
-                "(pod name, phase, restart count, readiness)."
+                f"Get status for pods in '{NAMESPACE}' matching a label selector. "
+                "Includes phase, readiness, restarts, State, per-container waiting / "
+                "terminated / last_termination reasons, and scheduling or readiness "
+                "condition messages. OOMKilled on last_termination stays the root "
+                "cause even when the current waiting reason is CrashLoopBackOff."
             ),
             inputSchema={
                 "type": "object",
@@ -108,7 +113,8 @@ async def list_tools() -> list[Tool]:
             description=(
                 f"Get Kubernetes events from '{NAMESPACE}' within a time window. "
                 "Shows timestamp, type, reason, involved OBJECT (kind/name), and message. "
-                "Look for Killing, Started, Pulled, BackOff, Unhealthy after chaos. "
+                "Look for Killing, Started, Pulled, BackOff, Unhealthy, Failed, "
+                "FailedScheduling, ErrImagePull, and OOMKilling. "
                 "IMPORTANT: always correlate events using the OBJECT column, not just "
                 "timestamp proximity -- an event about one pod can appear right next "
                 "to an unrelated event about a different (often stale/previous) pod."
