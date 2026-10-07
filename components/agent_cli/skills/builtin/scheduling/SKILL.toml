@@ -1,0 +1,32 @@
+schema_version = "1"
+id = "scheduling"
+version = "1.0.0"
+description = "Investigate Pending pods with FailedScheduling / Unschedulable evidence."
+tags = ["pod", "scheduling"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "scheduling"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["fault_diagnosis", "recovery_check", "unknown", "health_check"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 70
+specificity = 90
+fallback = false
+match = "any"
+
+[[routing.observations]]
+field = "event_reason"
+op = "eq"
+value = "FailedScheduling"
+
+[[routing.observations]]
+field = "state"
+op = "contains"
+value = "Unschedulable"
+
+[[routing.observations]]
+field = "waiting_reason"
+op = "contains"
+value = "Unschedulable"

@@ -1,0 +1,26 @@
+schema_version = "1"
+id = "healthy"
+version = "1.0.0"
+description = "Bounded healthy observation after a successful scan with no current FOCUS objects."
+tags = ["health"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "healthy"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["health_check", "fault_diagnosis", "recovery_check", "unknown"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 20
+specificity = 40
+fallback = false
+
+[[routing.observations]]
+field = "scan_status"
+op = "in"
+value = ["success", "empty"]
+
+[[routing.observations]]
+field = "focus_count"
+op = "eq"
+value = 0

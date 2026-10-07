@@ -1,0 +1,27 @@
+schema_version = "1"
+id = "readiness"
+version = "1.0.0"
+description = "Investigate RunningNotReady / failing probes without rewriting them as crashes."
+tags = ["pod", "probe", "readiness"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "readiness"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["fault_diagnosis", "recovery_check", "unknown", "health_check"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 60
+specificity = 80
+fallback = false
+match = "any"
+
+[[routing.observations]]
+field = "state"
+op = "contains"
+value = "RunningNotReady"
+
+[[routing.observations]]
+field = "event_reason"
+op = "eq"
+value = "Unhealthy"

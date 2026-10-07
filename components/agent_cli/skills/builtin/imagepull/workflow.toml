@@ -1,0 +1,3 @@
+id = "imagepull"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-imagepull", "fragment:recovery", "fragment:synthesize"]

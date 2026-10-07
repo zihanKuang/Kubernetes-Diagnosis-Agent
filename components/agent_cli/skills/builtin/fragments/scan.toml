@@ -1,0 +1,13 @@
+id = "scan"
+version = "1.0.0"
+
+[[stages]]
+id = "scan"
+processor = "scan"
+tools = ["list_pods"]
+optional_tools = ["get_recent_events"]
+inputs = ["query"]
+outputs = ["observation_snapshot"]
+complete_tools = ["list_pods"]
+on_failure = "unknown_output"
+optional = false

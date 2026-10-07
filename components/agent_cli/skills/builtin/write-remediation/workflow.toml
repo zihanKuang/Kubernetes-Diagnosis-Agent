@@ -1,0 +1,3 @@
+id = "write-remediation"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-generic", "fragment:recovery", "fragment:synthesize"]

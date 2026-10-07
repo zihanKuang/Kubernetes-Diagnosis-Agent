@@ -1,0 +1,3 @@
+id = "crashloop"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-crashloop", "fragment:recovery", "fragment:synthesize"]

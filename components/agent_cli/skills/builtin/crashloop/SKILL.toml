@@ -1,0 +1,26 @@
+schema_version = "1"
+id = "crashloop"
+version = "1.0.0"
+description = "Inspect CrashLoopBackOff waiting state, exit reason, and logs without treating backoff as root cause."
+tags = ["pod", "crashloop"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "crashloop"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["fault_diagnosis", "recovery_check", "unknown", "health_check"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 50
+specificity = 60
+fallback = false
+
+[[routing.observations]]
+field = "state"
+op = "contains"
+value = "CrashLoopBackOff"
+
+[[routing.exclude]]
+field = "last_termination"
+op = "contains"
+value = "OOMKilled"

@@ -1,0 +1,3 @@
+id = "pod-lifecycle"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-lifecycle", "fragment:recovery", "fragment:synthesize"]

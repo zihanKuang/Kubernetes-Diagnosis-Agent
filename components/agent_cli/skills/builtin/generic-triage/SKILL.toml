@@ -1,0 +1,16 @@
+schema_version = "1"
+id = "generic-triage"
+version = "1.0.0"
+description = "Scan the namespace, identify FOCUS objects, and keep a generic inspect path when no specific failure class matches."
+tags = ["triage", "fallback"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "generic-triage"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["health_check", "fault_diagnosis", "recovery_check", "unknown"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 0
+specificity = 0
+fallback = true

@@ -1,0 +1,17 @@
+id = "inspect-imagepull"
+version = "1.0.0"
+
+[[stages]]
+id = "inspect"
+processor = "inspect"
+tools = ["get_pod_status"]
+optional_tools = ["get_recent_events"]
+inputs = ["observation_snapshot", "focus"]
+outputs = ["inspect_records"]
+complete_tools = ["get_pod_status"]
+on_failure = "unknown_output"
+
+[[stages.enter_when]]
+field = "focus_count"
+op = "gt"
+value = 0

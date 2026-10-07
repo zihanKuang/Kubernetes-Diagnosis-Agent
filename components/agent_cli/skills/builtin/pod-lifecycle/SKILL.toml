@@ -1,0 +1,21 @@
+schema_version = "1"
+id = "pod-lifecycle"
+version = "1.0.0"
+description = "Investigate Killing events, replacements, ReplicaSet ownership, and UID relationships."
+tags = ["pod", "lifecycle", "kill"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "pod-lifecycle"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["fault_diagnosis", "recovery_check", "unknown", "health_check"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 40
+specificity = 70
+fallback = false
+
+[[routing.observations]]
+field = "event_reason"
+op = "eq"
+value = "Killing"

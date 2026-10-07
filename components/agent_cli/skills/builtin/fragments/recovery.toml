@@ -1,0 +1,16 @@
+id = "recovery"
+version = "1.0.0"
+
+[[stages]]
+id = "verify"
+processor = "verify"
+tools = ["validate_recovery"]
+inputs = ["focus"]
+outputs = ["recovery_verdict"]
+complete_tools = ["validate_recovery"]
+on_failure = "unknown_output"
+
+[[stages.enter_when]]
+field = "focus_count"
+op = "gt"
+value = 0

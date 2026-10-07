@@ -1,0 +1,3 @@
+id = "readiness"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-readiness", "fragment:recovery", "fragment:synthesize"]

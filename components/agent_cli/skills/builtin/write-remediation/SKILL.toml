@@ -1,0 +1,17 @@
+schema_version = "1"
+id = "write-remediation"
+version = "1.0.0"
+description = "Optional write workflow. Disabled unless explicitly enabled. Writes still require the existing human gate."
+tags = ["write"]
+entrypoints = ["cli"]
+workflow_id = "write-remediation"
+instructions = "SKILL.md"
+enabled = false
+required_capabilities = ["write"]
+
+[routing]
+intents = ["fault_diagnosis"]
+entrypoints = ["cli"]
+priority = 0
+specificity = 0
+fallback = false

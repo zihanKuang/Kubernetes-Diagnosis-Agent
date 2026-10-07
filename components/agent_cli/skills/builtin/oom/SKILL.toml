@@ -1,0 +1,27 @@
+schema_version = "1"
+id = "oom"
+version = "1.0.0"
+description = "Inspect OOMKilled last_termination and related limits. Waiting may still show CrashLoopBackOff."
+tags = ["pod", "oom"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "oom"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["fault_diagnosis", "recovery_check", "unknown", "health_check"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 80
+specificity = 100
+fallback = false
+match = "any"
+
+[[routing.observations]]
+field = "last_termination"
+op = "contains"
+value = "OOMKilled"
+
+[[routing.observations]]
+field = "state"
+op = "contains"
+value = "OOMKilled"

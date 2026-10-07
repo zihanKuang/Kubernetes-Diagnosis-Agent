@@ -1,0 +1,3 @@
+id = "scheduling"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-scheduling", "fragment:recovery", "fragment:synthesize"]

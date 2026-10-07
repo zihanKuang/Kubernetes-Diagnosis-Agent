@@ -1,0 +1,32 @@
+schema_version = "1"
+id = "imagepull"
+version = "1.0.0"
+description = "Investigate pods that never started because the image could not be pulled."
+tags = ["pod", "imagepull"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "imagepull"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["fault_diagnosis", "recovery_check", "unknown", "health_check"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 70
+specificity = 90
+fallback = false
+match = "any"
+
+[[routing.observations]]
+field = "state"
+op = "contains"
+value = "ImagePullBackOff"
+
+[[routing.observations]]
+field = "state"
+op = "contains"
+value = "ErrImagePull"
+
+[[routing.observations]]
+field = "waiting_reason"
+op = "contains"
+value = "ImagePullBackOff"

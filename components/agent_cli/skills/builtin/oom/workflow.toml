@@ -1,0 +1,3 @@
+id = "oom"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-oom", "fragment:recovery", "fragment:synthesize"]

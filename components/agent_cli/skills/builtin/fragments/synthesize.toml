@@ -1,0 +1,11 @@
+id = "synthesize"
+version = "1.0.0"
+
+[[stages]]
+id = "synthesize"
+processor = "synthesize"
+tools = []
+inputs = ["observation_snapshot", "inspect_records"]
+outputs = ["diagnosis_draft"]
+on_failure = "fail"
+optional = false
