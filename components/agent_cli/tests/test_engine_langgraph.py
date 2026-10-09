@@ -1,5 +1,6 @@
 """LangGraph engine: swapped orchestration, identical harness (gates, evidence, stats)."""
 import asyncio
+import json
 
 import pytest
 
@@ -14,7 +15,7 @@ class ScriptedLLM:
     def __init__(self, responses):
         self.responses = list(responses)
 
-    async def generate_with_tools(self, messages, tools):
+    async def generate_with_tools(self, messages, tools, **kwargs):
         return self.responses.pop(0)
 
 
@@ -50,10 +51,24 @@ def make_agent(responses, max_steps=4):
 
 
 def test_tool_call_then_final_answer_with_evidence_footer():
+    payload = json.dumps({
+        "scope": "frontend",
+        "unknowns": [],
+        "claims": [{
+            "id": "c1",
+            "statement": "frontend pods are Ready.",
+            "type": "observation",
+            "object": "Pod/frontend",
+            "window": "current",
+            "obs": [],
+            "evidence": ["ev-1"],
+            "confidence": "high",
+        }],
+    })
     agent = make_agent(
         [
             {"content": None, "tool_calls": [tool_call("list_pods")]},
-            {"content": "frontend pods are Ready.", "tool_calls": []},
+            {"content": payload, "tool_calls": []},
         ]
     )
     answer = asyncio.run(agent.run("status of frontend pods?"))
@@ -82,7 +97,20 @@ def test_gated_write_is_still_denied(monkeypatch):
                 "content": None,
                 "tool_calls": [tool_call("restart_deployment", {"name": "frontend"})],
             },
-            {"content": "write was denied; gather evidence first.", "tool_calls": []},
+            {"content": json.dumps({
+                "scope": "frontend",
+                "unknowns": [],
+                "claims": [{
+                    "id": "c1",
+                    "statement": "write was denied; gather evidence first.",
+                    "type": "observation",
+                    "object": "Pod/frontend",
+                    "window": "current",
+                    "obs": [],
+                    "evidence": ["ev-1"],
+                    "confidence": "low",
+                }],
+            }), "tool_calls": []},
         ]
     )
     asyncio.run(agent.run("restart frontend now"))

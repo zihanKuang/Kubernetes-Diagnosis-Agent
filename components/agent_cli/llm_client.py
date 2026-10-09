@@ -153,6 +153,15 @@ class ModelClient:
         self.max_tokens = max(1, int(max_tokens))
         self._semaphore = asyncio.Semaphore(max(1, int(max_concurrency)))
         self._client = None
+        self.reset_usage()
+
+    def reset_usage(self) -> None:
+        """Per-run counters. Prometheus stays cumulative; this dict does not."""
+        self.usage: Dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "llm_calls": 0,
+        }
 
     def _ensure_client(self):
         if self._client is not None:
@@ -173,10 +182,12 @@ class ModelClient:
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         tool_choice: str | None = None,
+        system_instruction: str | None = None,
     ) -> Dict[str, Any]:
+        instruction = self.system_instruction if system_instruction is None else system_instruction
         kwargs: Dict[str, Any] = {
             "model": self.model_name,
-            "messages": messages_for_api(messages, self.system_instruction),
+            "messages": messages_for_api(messages, instruction),
             "temperature": 0.2,
             "max_tokens": self.max_tokens,
         }
@@ -195,9 +206,15 @@ class ModelClient:
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         tool_choice: str | None = None,
+        system_instruction: str | None = None,
     ) -> Dict[str, Any]:
         self._ensure_client()
-        kwargs = self._request_kwargs(messages, tools, tool_choice=tool_choice)
+        kwargs = self._request_kwargs(
+            messages,
+            tools,
+            tool_choice=tool_choice,
+            system_instruction=system_instruction,
+        )
         last_error: Optional[Exception] = None
 
         for attempt in range(1, self.max_retries + 1):
@@ -234,12 +251,17 @@ class ModelClient:
                 elapsed = time.monotonic() - start
                 observe_llm_request(self.provider, self.model_name, "ok", elapsed)
                 usage = getattr(response, "usage", None)
+                self.usage["llm_calls"] += 1
                 if usage is not None:
+                    prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
+                    completion = int(getattr(usage, "completion_tokens", 0) or 0)
+                    self.usage["prompt_tokens"] += prompt
+                    self.usage["completion_tokens"] += completion
                     add_llm_tokens(
                         self.provider,
                         self.model_name,
-                        prompt=getattr(usage, "prompt_tokens", 0) or 0,
-                        completion=getattr(usage, "completion_tokens", 0) or 0,
+                        prompt=prompt,
+                        completion=completion,
                     )
                 return self._parse_response(response)
 

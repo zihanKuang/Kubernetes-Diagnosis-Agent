@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 from .agent import ReActAgent
-from .config import AgentConfig
+from .config import AgentConfig, default_trace_dir
+from .skills.errors import SkillError
 
 
 async def main():
@@ -63,15 +64,39 @@ async def main():
         help="Orchestration engine: hand-written ReAct loop (default) or "
              "LangGraph StateGraph (same tools/harness, needs the langgraph extra)",
     )
-    
-    args = parser.parse_args()
-    
-    # Create config
-    config = AgentConfig(
-        max_steps=args.max_steps,
-        log_level="DEBUG" if args.verbose else "INFO",
-        mcp_url=args.mcp_url,
+    parser.add_argument(
+        "--skill-routing",
+        choices=["legacy", "auto"],
+        default=None,
+        help="Skill routing mode. Default legacy (current prompts). auto enables Citrus Skills.",
     )
+    parser.add_argument(
+        "--skill",
+        default=None,
+        help="Lock a Skill id (implies --skill-routing auto). Does not skip scan, evidence, or write approval.",
+    )
+    parser.add_argument(
+        "--skill-dir",
+        action="append",
+        default=None,
+        help="Extra local Skill directory (repeatable). Not scanned unless listed here.",
+    )
+
+    args = parser.parse_args()
+
+    try:
+        config = AgentConfig(
+            max_steps=args.max_steps,
+            log_level="DEBUG" if args.verbose else "INFO",
+            mcp_url=args.mcp_url,
+            trace_dir=default_trace_dir(),
+            skill_routing=args.skill_routing,
+            skill_id=args.skill,
+            skill_extra_dirs=args.skill_dir,
+        )
+    except SkillError as exc:
+        print(f"Error: {exc}")
+        sys.exit(2)
     if args.model:
         config.model_name = args.model
 
@@ -103,7 +128,7 @@ async def main():
             await interactive_mode(agent)
         elif args.query:
             # Single query mode
-            result = await agent.run(args.query)
+            result = await agent.run(args.query, entrypoint="cli")
             print(f"\n{result}\n")
         else:
             # No query provided
@@ -135,7 +160,7 @@ async def interactive_mode(agent: ReActAgent):
             
             # Run agent
             print()
-            result = await agent.run(query)
+            result = await agent.run(query, entrypoint="interactive")
             print(f"\nAgent: {result}\n")
         
         except KeyboardInterrupt:

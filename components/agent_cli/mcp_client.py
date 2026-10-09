@@ -1,9 +1,10 @@
 """MCP client: stdio (local) or Streamable HTTP (remote)."""
 
 import asyncio
+import copy
 import os
 from contextlib import AsyncExitStack
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -16,6 +17,8 @@ from .exceptions import (
     ToolTimeoutError,
 )
 from .logging_utils import log_mcp_debug, log_mcp_error
+from .trace_store import parse_mcp_result
+from .evidence_models import ToolPayload
 
 
 class MCPClient:
@@ -113,12 +116,14 @@ class MCPClient:
     async def _fetch_tools(self):
         try:
             response = await self.session.list_tools()
+            fresh: Dict[str, Dict] = {}
             for tool in response.tools:
-                self._tools_cache[tool.name] = {
+                fresh[tool.name] = {
                     "name": tool.name,
                     "description": tool.description,
                     "input_schema": tool.inputSchema,
                 }
+            self._tools_cache = fresh
             log_mcp_debug(f"Fetched {len(self._tools_cache)} tools")
         except Exception as e:
             log_mcp_error("Failed to fetch tools", error=e)
@@ -126,20 +131,45 @@ class MCPClient:
                 f"Failed to fetch tools: {e}", original_error=e
             )
 
-    def get_tools(self) -> List[Dict[str, Any]]:
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool["name"],
-                    "description": tool["description"],
-                    "parameters": tool["input_schema"],
-                },
-            }
-            for tool in self._tools_cache.values()
-        ]
+    async def refresh_tools(self):
+        await self._fetch_tools()
+
+    def get_tools(self, names: Optional[Sequence[str]] = None) -> List[Dict[str, Any]]:
+        if names is None:
+            selected = list(self._tools_cache.values())
+        else:
+            selected = [
+                self._tools_cache[name]
+                for name in names
+                if name in self._tools_cache
+            ]
+        return [self._as_openai_tool(copy.deepcopy(tool)) for tool in selected]
+
+    def get_tools_by_name(self, names: Sequence[str]) -> Dict[str, Any]:
+        found = []
+        missing = []
+        for name in names:
+            if name in self._tools_cache:
+                found.append(self._as_openai_tool(copy.deepcopy(self._tools_cache[name])))
+            else:
+                missing.append(name)
+        return {"tools": found, "missing": missing}
+
+    def _as_openai_tool(self, tool: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["input_schema"],
+            },
+        }
 
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+        payload = await self.call_tool_result(tool_name, arguments)
+        return payload.text
+
+    async def call_tool_result(self, tool_name: str, arguments: Dict[str, Any]) -> ToolPayload:
         if tool_name not in self._tools_cache:
             raise ToolNotFoundError(
                 f"Tool '{tool_name}' not found. "
@@ -152,23 +182,12 @@ class MCPClient:
                 self.session.call_tool(tool_name, arguments),
                 timeout=self.timeout_seconds,
             )
-
-            if hasattr(result, "content") and result.content:
-                parts = []
-                for content in result.content:
-                    if hasattr(content, "text"):
-                        parts.append(content.text)
-                    else:
-                        parts.append(str(content))
-                result_text = "\n".join(parts)
-            else:
-                result_text = str(result)
-
+            payload = parse_mcp_result(result)
             log_mcp_debug(
-                f"Tool result: {result_text[:200]}"
-                f"{'...' if len(result_text) > 200 else ''}"
+                f"Tool result: {payload.text[:200]}"
+                f"{'...' if len(payload.text) > 200 else ''}"
             )
-            return result_text
+            return payload
 
         except asyncio.TimeoutError as e:
             log_mcp_error(

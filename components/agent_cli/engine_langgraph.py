@@ -46,6 +46,7 @@ class LangGraphAgent(ReActAgent):
                 "(the default engine, --engine react, needs nothing extra)"
             )
         super().__init__(config)
+        self.engine_name = "langgraph"
         self._graph = self._build_graph()
         log_agent_info("LangGraph engine active (StateGraph orchestration)")
 
@@ -66,15 +67,17 @@ class LangGraphAgent(ReActAgent):
         if self.stats["total_steps"] >= self.config.max_steps:
             raise MaxStepsExceededError(f"Exceeded {self.config.max_steps} steps")
         self.stats["total_steps"] += 1
+        self.skill.note_step()
         step = self.stats["total_steps"]
         log_agent_info(f"[langgraph] reason step {step}/{self.config.max_steps}")
 
         try:
-            force_tools = self.tools and not (self.stats.get("tool_calls") or {})
+            tools, tool_choice, instruction = self._model_call_args()
             response = await self.llm_client.generate_with_tools(
                 messages=self.messages,
-                tools=self.tools,
-                tool_choice="required" if force_tools else None,
+                tools=tools,
+                tool_choice=tool_choice,
+                system_instruction=instruction,
             )
         except LLMError as e:
             log_agent_error("LLM error", error=e)
@@ -90,6 +93,23 @@ class LangGraphAgent(ReActAgent):
 
         if not response.get("tool_calls"):
             content = (response.get("content") or "").strip()
+            if self.skill.auto():
+                if content and self.skill.allow_final_answer():
+                    log_agent_info(f"\n[langgraph] Final Answer:\n{content}")
+                    return {"response": response, "final_answer": content}
+                if content:
+                    log_agent_info("Rejected early final answer; current skill stage still requires tools")
+                    self.messages.append({"role": "assistant", "content": content})
+                    self.messages.append({
+                        "role": "user",
+                        "content": (
+                            "Rejected: the current investigation stage still requires tool evidence. "
+                            "Call the provided tools. Do not invent cluster state."
+                        ),
+                    })
+                else:
+                    log_agent_error("LLM returned empty response")
+                return {"response": response}
             if content and (self.stats.get("tool_calls") or {}):
                 log_agent_info(f"\n[langgraph] Final Answer:\n{content}")
                 return {"response": response, "final_answer": content}
@@ -122,6 +142,8 @@ class LangGraphAgent(ReActAgent):
 
     async def _react_loop(self) -> str:
         try:
+            if self._cancelled or self.skill.cancelled():
+                raise MaxStepsExceededError("run cancelled")
             final_state = await self._graph.ainvoke(
                 {"llm_errors": 0},
                 config={"recursion_limit": self.config.max_steps * 2 + 2},

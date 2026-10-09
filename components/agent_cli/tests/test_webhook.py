@@ -64,6 +64,9 @@ def test_bearer_auth_and_card_high():
     assert code == 200
     assert card["status"] == "ok"
     assert card["evidence_level"] == "HIGH"
+    assert card["diagnosis_status"] == "not_reviewed"
+    assert card["recovery_status"] == "unknown"
+    assert card["claims"] == []
     assert card["suspected_root_cause"]
     assert "frontend" in (card["suspected_root_cause"] or "")
     assert card["blast_radius"]["alerted"] == ["frontend"]
@@ -168,3 +171,39 @@ def test_blast_radius_includes_one_hop_neighbors():
     assert card["blast_radius"]["alerted"] == ["frontend"]
     assert set(card["blast_radius"]["one_hop_neighbors"]) == {"cart", "checkout"}
     assert any(row["tool"] == "list_pods" for row in card["evidence_links"])
+
+
+def test_card_shares_claim_structure_with_cli():
+    crash = {
+        "id": "obs-2",
+        "kind": "Pod",
+        "name": "citrus-crashloop-abc",
+        "component": "citrus-crashloop",
+        "focus": True,
+        "window": "current",
+        "object_ref": "Pod/citrus-crashloop-abc",
+    }
+    card = render_card(
+        payload=_payload(),
+        answer=(
+            "Evidence: obs-2 Pod/citrus-crashloop-abc window=current "
+            "CrashLoopBackOff. validate_recovery=FAIL."
+        ),
+        stats={
+            "tool_calls": {
+                "list_pods": 1,
+                "get_recent_events": 1,
+                "validate_recovery": 1,
+            },
+            "errors": 0,
+            "focus": ["obs-2"],
+            "observations": [crash],
+        },
+        query="Alertmanager firing on frontend. Short RCA, then validate_recovery.",
+        edges=[],
+    )
+    assert card["evidence_level"] == "HIGH"
+    assert card["diagnosis_status"] == "not_reviewed"
+    assert card["claims"][0]["status"] == "reference_valid"
+    assert card["claims"][0]["obs_id"] == "obs-2"
+    assert card["claims"][0]["object_ref"] == "Pod/citrus-crashloop-abc"

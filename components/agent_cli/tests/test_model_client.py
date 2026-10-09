@@ -32,9 +32,9 @@ def inject_fake_api(client: ModelClient, create_fn) -> None:
     )
 
 
-def fake_response(content="ok"):
+def fake_response(content="ok", usage=None):
     message = SimpleNamespace(content=content, tool_calls=None)
-    return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=None)
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
 
 
 class FakeAPIError(Exception):
@@ -138,6 +138,29 @@ def test_retryable_reason_classification():
     assert retryable_reason(FakeAPIError(500)) == "server_error"
     assert retryable_reason(FakeAPIError(404)) is None
     assert retryable_reason(ValueError("nope")) is None
+
+
+def test_usage_accumulates_per_success_and_resets():
+    client = make_client()
+
+    async def create(**kwargs):
+        return fake_response(usage=SimpleNamespace(prompt_tokens=11, completion_tokens=3))
+
+    inject_fake_api(client, create)
+    msgs = [{"role": "user", "content": "q"}]
+    asyncio.run(client.generate_with_tools(msgs, []))
+    asyncio.run(client.generate_with_tools(msgs, []))
+    assert client.usage == {
+        "prompt_tokens": 22,
+        "completion_tokens": 6,
+        "llm_calls": 2,
+    }
+    client.reset_usage()
+    assert client.usage == {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "llm_calls": 0,
+    }
 
 
 def test_legacy_llmclient_alias():

@@ -20,10 +20,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from .agent import ReActAgent
-from .config import AgentConfig
-from .eval_score import split_answer
-from .evidence import assess
+from .config import AgentConfig, default_trace_dir
+from .evidence import assess, split_answer
 from .metrics import render as render_metrics
+from .skills.context import webhook_labels
 from .topology import ServiceGraph
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -200,6 +200,9 @@ def render_card(
         "suspected_root_cause": root_cause,
         "evidence_level": check.level,
         "evidence_reasons": list(check.reasons),
+        "diagnosis_status": check.diagnosis_status,
+        "recovery_status": check.recovery_status,
+        "claims": [c.as_dict() for c in check.claims],
         "tools": tools,
         "note": note,
     }
@@ -296,7 +299,10 @@ class WebhookApp:
         edges = self.graph.edges_among(services) if services else []
         query = build_query(payload, edges)
         try:
-            answer, stats = self.runner(query)
+            try:
+                answer, stats = self.runner(query, payload)
+            except TypeError:
+                answer, stats = self.runner(query)
         except Exception as exc:
             degrade(payload, str(exc), path=self.degrade_path)
             return 200, {
@@ -364,7 +370,10 @@ class AgentRunner:
     """One ReAct agent on a background event loop so the HTTP thread can call it."""
 
     def __init__(self, config: Optional[AgentConfig] = None):
-        self.config = config or AgentConfig(writes_interactive=False)
+        self.config = config or AgentConfig(
+            writes_interactive=False,
+            trace_dir=str(default_trace_dir()),
+        )
         self.loop = asyncio.new_event_loop()
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.agent = ReActAgent(self.config)
@@ -378,8 +387,17 @@ class AgentRunner:
         fut = asyncio.run_coroutine_threadsafe(self.agent.initialize(), self.loop)
         fut.result(timeout=60)
 
-    def run(self, query: str) -> Tuple[str, Dict[str, Any]]:
-        fut = asyncio.run_coroutine_threadsafe(self.agent.run(query), self.loop)
+    def run(self, query: str, payload: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+        meta = {}
+        if payload:
+            meta = {
+                "named_workloads": alert_services(payload),
+                "alert_labels": webhook_labels(payload),
+            }
+        fut = asyncio.run_coroutine_threadsafe(
+            self.agent.run(query, entrypoint="webhook", request_meta=meta),
+            self.loop,
+        )
         answer = fut.result(timeout=180)
         return answer, dict(self.agent.stats)
 
