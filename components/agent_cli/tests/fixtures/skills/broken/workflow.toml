@@ -1,0 +1,7 @@
+id = "broken"
+version = "1.0.0"
+
+[[stages]]
+id = "scan"
+processor = "not-a-real-processor"
+tools = ["list_pods"]

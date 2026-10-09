@@ -1,0 +1,8 @@
+schema_version = "1"
+id = "broken-skill"
+version = "1.0.0"
+description = "Intentionally invalid processor for validate tests."
+entrypoints = ["cli"]
+workflow_id = "broken"
+instructions = "SKILL.md"
+enabled = true

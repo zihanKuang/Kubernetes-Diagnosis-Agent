@@ -1,0 +1,7 @@
+id = "crashloop-status-only"
+version = "1.0.0"
+compose = ["fragment:scan", "fragment:inspect-crashloop", "fragment:recovery", "fragment:synthesize"]
+
+[[replace]]
+stage_id = "inspect"
+with_fragment = "fragment:inspect-status-only"

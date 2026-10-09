@@ -1,0 +1,19 @@
+{
+  "scan_status": "success",
+  "list_pods_ok": true,
+  "events_ok": true,
+  "observation_ids": ["obs-1"],
+  "focus": [
+    {
+      "obs_id": "obs-1",
+      "name": "citrus-oom-abc",
+      "component": "citrus-oom",
+      "phase": "Running",
+      "state": "CrashLoopBackOff",
+      "waiting_reason": "CrashLoopBackOff",
+      "last_termination": "OOMKilled(exit=137)",
+      "restarts": 3,
+      "ready": false
+    }
+  ]
+}

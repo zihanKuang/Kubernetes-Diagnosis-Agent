@@ -1,0 +1,26 @@
+schema_version = "1"
+id = "crashloop-status-only"
+version = "1.0.0"
+description = "External example: same crashloop workflow with inspect replaced by status-only."
+tags = ["example", "replace"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+workflow_id = "crashloop-status-only"
+instructions = "SKILL.md"
+enabled = true
+
+[routing]
+intents = ["fault_diagnosis", "recovery_check", "unknown", "health_check"]
+entrypoints = ["cli", "interactive", "webhook", "eval"]
+priority = 55
+specificity = 61
+fallback = false
+
+[[routing.observations]]
+field = "state"
+op = "contains"
+value = "CrashLoopBackOff"
+
+[[routing.exclude]]
+field = "last_termination"
+op = "contains"
+value = "OOMKilled"
