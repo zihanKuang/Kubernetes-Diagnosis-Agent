@@ -1,8 +1,8 @@
-"""Hard RCA scorer. No LLM judge.
+"""Hard phrase scorer. No LLM judge.
 
-A hit means: the answer body names the labeled service / failure mode.
-It does not mean the write-up is a good RCA. Evidence level is a separate field
-from the Step-1 stamp (tool-call counts), not from this phrase check.
+phrase_hit means: the answer body names the labeled service / failure mode.
+It is not RCA accuracy. root_cause_hit is a compatibility alias of phrase_hit
+for old eval JSON. Evidence level is a process stamp, not semantic review.
 """
 from __future__ import annotations
 
@@ -10,18 +10,10 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .eval_scenarios import Scenario
-from .evidence import assess
+from .evidence import assess, split_answer
 
 
-FOOTER_MARK = "\n---\n"
-
-
-def split_answer(text: str) -> tuple[str, str]:
-    """Body is what we score. Footer is the evidence stamp — ignore it here."""
-    if FOOTER_MARK in text:
-        body, footer = text.rsplit(FOOTER_MARK, 1)
-        return body.strip(), footer.strip()
-    return (text or "").strip(), ""
+SCORING_RULE = "phrase_v1"
 
 
 def _haystack(body: str) -> str:
@@ -39,24 +31,34 @@ def _hits(phrases: List[str], hay: str) -> List[str]:
 @dataclass
 class Score:
     scenario_id: str
-    root_cause_hit: bool
+    phrase_hit: bool = False
+    root_cause_hit: bool = False  # compatibility alias of phrase_hit
+    scoring_rule: str = SCORING_RULE
     missing_required: List[str] = field(default_factory=list)
     missing_any: List[str] = field(default_factory=list)
     forbidden_hits: List[str] = field(default_factory=list)
     evidence_level: str = ""
     evidence_reasons: List[str] = field(default_factory=list)
+    diagnosis_status: str = "not_reviewed"
+    recovery_status: str = "unknown"
     expected_tools_missing: List[str] = field(default_factory=list)
     duration_s: Optional[float] = None
     steps: int = 0
     tool_calls: int = 0
     tools_used: Dict[str, int] = field(default_factory=dict)
     errors: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    llm_calls: int = 0
     answer_body: str = ""
     stale_mix: bool = False
     stale_hits: List[str] = field(default_factory=list)
+    claims: List[Dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        payload["root_cause_hit_is_legacy"] = True
+        return payload
 
 
 _KILL = ("kill", "killed", "killing", "terminat", "deleted", "chaos")
@@ -103,19 +105,27 @@ def score(scenario: Scenario, answer: str, stats: Dict[str, Any]) -> Score:
 
     return Score(
         scenario_id=scenario.id,
+        phrase_hit=hit,
         root_cause_hit=hit,
+        scoring_rule=SCORING_RULE,
         missing_required=missing_required,
         missing_any=missing_any,
         forbidden_hits=forbidden_hits,
         evidence_level=check.level,
         evidence_reasons=list(check.reasons),
+        diagnosis_status=check.diagnosis_status,
+        recovery_status=check.recovery_status,
         expected_tools_missing=expected_missing,
         duration_s=duration,
         steps=int(stats.get("total_steps") or 0),
         tool_calls=sum(tools_used.values()),
         tools_used=tools_used,
         errors=int(stats.get("errors") or 0),
+        prompt_tokens=int(stats.get("prompt_tokens") or 0),
+        completion_tokens=int(stats.get("completion_tokens") or 0),
+        llm_calls=int(stats.get("llm_calls") or 0),
         answer_body=body,
         stale_mix=bool(stale_hits),
         stale_hits=stale_hits,
+        claims=[c.as_dict() for c in check.claims],
     )

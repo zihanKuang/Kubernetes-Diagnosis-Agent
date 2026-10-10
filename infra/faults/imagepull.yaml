@@ -1,0 +1,45 @@
+# ImagePullBackOff fixture. Not Chaos Mesh.
+# registry.invalid does not resolve, so the container never starts.
+#
+# Apply:  kubectl apply -f infra/faults/imagepull.yaml
+# Delete: kubectl delete -f infra/faults/imagepull.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: citrus-imagepull
+  namespace: citrus
+  labels:
+    app: citrus-fault
+    citrus.dev/fault-fixture: "true"
+    experiment: imagepull-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: citrus-imagepull
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: citrus-imagepull
+        app: citrus-fault
+        citrus.dev/fault-fixture: "true"
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: imagepull
+          image: registry.invalid/citrus/missing:no-such-tag
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            capabilities:
+              drop: ["ALL"]

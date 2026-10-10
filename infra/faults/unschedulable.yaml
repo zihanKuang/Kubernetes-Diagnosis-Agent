@@ -1,0 +1,47 @@
+# Unschedulable fixture. Not Chaos Mesh.
+# nodeSelector matches no node, so the pod stays Pending and the image is never pulled.
+#
+# Apply:  kubectl apply -f infra/faults/unschedulable.yaml
+# Delete: kubectl delete -f infra/faults/unschedulable.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: citrus-unschedulable
+  namespace: citrus
+  labels:
+    app: citrus-fault
+    citrus.dev/fault-fixture: "true"
+    experiment: pod-unschedulable
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: citrus-unschedulable
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: citrus-unschedulable
+        app: citrus-fault
+        citrus.dev/fault-fixture: "true"
+    spec:
+      terminationGracePeriodSeconds: 1
+      nodeSelector:
+        citrus.dev/no-such-node: "true"
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              cpu: 50m
+              memory: 16Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65535
+            capabilities:
+              drop: ["ALL"]

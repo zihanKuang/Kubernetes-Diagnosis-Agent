@@ -1,0 +1,48 @@
+# CrashLoopBackOff fixture. Not Chaos Mesh.
+# The process prints one line and exits 1. Memory limit is high enough that
+# this is not an OOM. ReplicaSet keeps the pod; it does not become Ready.
+#
+# Apply:  kubectl apply -f infra/faults/crashloop.yaml
+# Watch:  kubectl get pods -n citrus -l app.kubernetes.io/component=citrus-crashloop
+# Delete: kubectl delete -f infra/faults/crashloop.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: citrus-crashloop
+  namespace: citrus
+  labels:
+    app: citrus-fault
+    citrus.dev/fault-fixture: "true"
+    experiment: crashloop-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: citrus-crashloop
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: citrus-crashloop
+        app: citrus-fault
+        citrus.dev/fault-fixture: "true"
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: crashloop
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "echo citrus-crashloop-fixture; exit 1"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            capabilities:
+              drop: ["ALL"]
