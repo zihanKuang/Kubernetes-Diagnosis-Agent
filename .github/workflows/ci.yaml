@@ -68,12 +68,40 @@ jobs:
 
       - name: Install components (editable)
         run: |
-          pip install -e "components[test]"
+          pip install -e "components[test,langgraph]"
           pip install -e "components/mcp-server[test]"
 
       - name: Run tests
         working-directory: components
         run: python -m pytest agent_cli/tests mcp-server/tests -v
+
+      - name: Validate builtin Skills
+        working-directory: components
+        run: python -m agent_cli.skills validate
+
+      - name: Check Skill resources in the tree
+        working-directory: components
+        run: |
+          python -c "from importlib.resources import files; root=files('agent_cli.skills.builtin'); assert (root/'generic-triage'/'SKILL.toml').is_file(); print('builtin skills packaged')"
+
+      - name: Build wheel and check packaged Skills
+        working-directory: components
+        run: |
+          pip install build
+          rm -rf build
+          python -m build --wheel --outdir /tmp/citrus-skill-wheel
+          python - <<'PY'
+          import glob
+          import zipfile
+          wheels = glob.glob("/tmp/citrus-skill-wheel/*.whl")
+          assert wheels, "no wheel produced"
+          names = zipfile.ZipFile(wheels[0]).namelist()
+          tests = [n for n in names if "/tests/" in n]
+          assert not tests, tests[:8]
+          assert any(n.endswith("generic-triage/SKILL.toml") for n in names)
+          assert any(n.endswith("fragments/scan.toml") for n in names)
+          print("wheel ok", wheels[0], "files", len(names))
+          PY
 
   validate-deployment-scripts:
     name: Validate Deployment Scripts

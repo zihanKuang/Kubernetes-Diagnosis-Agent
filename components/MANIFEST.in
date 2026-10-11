@@ -1,0 +1,3 @@
+recursive-include agent_cli/skills/builtin *
+prune agent_cli/tests
+global-exclude __pycache__ *.py[cod] *.skil~

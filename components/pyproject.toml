@@ -17,6 +17,17 @@ dependencies = [
 test = ["pytest>=7.0"]
 metrics = ["prometheus-client>=0.20"]
 langgraph = ["langgraph>=0.2"]
+review = ["openevals>=0.0.19"]
 
 [tool.setuptools]
-packages = ["agent_cli"]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["agent_cli*"]
+exclude = ["agent_cli.tests", "agent_cli.tests.*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.toml", "*.md"]
+# Skill directories are data, not Python packages (several ids are not identifiers).
+"agent_cli.skills.builtin" = ["*/*.toml", "*/*.md", "fragments/*.toml"]
+"agent_cli.skill_bench" = ["adapted_instructions/*/*.md", "FINGERPRINTS.json"]
