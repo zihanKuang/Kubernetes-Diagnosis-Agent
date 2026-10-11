@@ -10,5 +10,6 @@ English docs for this repo.
 | [EVAL.md](EVAL.md) | RCA eval baseline |
 | [VLLM.md](VLLM.md) | Switch `ModelClient` to self-hosted vLLM |
 | [WEBHOOK.md](WEBHOOK.md) | Alertmanager webhook + incident card |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Symptom → cause → fix from earlier platform work |
+| [skills/AUTHORING.md](skills/AUTHORING.md) | Citrus Skill packages (register / route / load) |
+| [skills/WORKFLOWS.md](skills/WORKFLOWS.md) | Compose, replace, stage results |
 | [assets/](assets/) | Demo thumbnail |

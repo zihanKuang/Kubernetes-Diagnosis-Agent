@@ -22,7 +22,7 @@ Ops layer (this repo): monitoring stack, MCP server, hand-written ReAct agent CL
 | MCP server | K8s/Prometheus tools over MCP | `components/mcp-server/` |
 | Agent CLI | hand-written ReAct loop + hard evidence stamp | `components/agent_cli/` |
 | Model serving | provider-agnostic `ModelClient` (DeepSeek hosted / self-hosted vLLM) | `components/agent_cli/llm_client.py`, `docs/VLLM.md` |
-| Chaos | PodChaos + demo scripts | `infra/chaos/` |
+| Chaos | PodChaos, stuck-pod fixtures, demo scripts | `infra/chaos/`, `infra/faults/` |
 | RBAC / deploy | least-privilege SA + manifests | `infra/rbac/`, `infra/manifests/` |
 
 **Transports**
@@ -136,6 +136,19 @@ cd components
 python -m agent_cli "What is the status of frontend pods in citrus?"
 ```
 
+Default skill routing is **legacy** (the current `prompts.py` instruction). Citrus Skills are opt-in:
+
+```powershell
+cd components
+python -m agent_cli.skills list
+python -m agent_cli.skills validate
+python -m agent_cli.skills preview --query "Is anything unhealthy in citrus?"
+python -m agent_cli --skill-routing auto "Is anything unhealthy in the citrus namespace right now?"
+python -m agent_cli --skill crashloop --engine react "Why is citrus-crashloop unhealthy?"
+```
+
+`--skill` locks the skill id (implies auto). It does not skip scan, evidence, tool permission, or write approval. `--engine react|langgraph` is independent of skill choice. See [docs/skills/AUTHORING.md](docs/skills/AUTHORING.md).
+
 The answer ends with an `Evidence check: HIGH|MEDIUM|LOW` footer. That stamp is computed from tool-call stats in code, not by the LLM. Zero tool calls is always LOW.
 
 `python -m agent_cli` needs those editable installs (`pip install -e`). A bare `pip install` of listed packages is not enough (you get `No module named mcp` / `agent_cli`).
@@ -156,12 +169,12 @@ See [docs/DEMO.md](docs/DEMO.md) for the full demo path. Demo recording is at th
 ```powershell
 cd components
 python -m agent_cli.eval_rca --list          # no cluster
-python -m agent_cli.eval_rca --all           # live: 3 scenarios, writes data/eval/
+python -m agent_cli.eval_rca --all           # live catalog, writes data/eval/
 ```
 
-See [docs/EVAL.md](docs/EVAL.md). Hit = the answer named the labeled fault. Evidence HIGH/MEDIUM/LOW is the separate tool-call stamp.
+See [docs/EVAL.md](docs/EVAL.md). Hit = the answer named the labeled fault. Evidence HIGH/MEDIUM/LOW is the separate tool-call stamp. `--skill-routing auto` uses the same router as the CLI; scenario ids and `must_contain` are not routing inputs. Live `--all` still injects cluster faults.
 
-Frozen baseline (2026-08-13, memory off): **3/3 HIT**, all HIGH, ~8–14s. Ablation (memory on) is compared with `--compare`.
+Frozen baseline (2026-08-13, memory off, original 3 scenarios): **3/3 HIT**, all HIGH, ~8–14s. The catalog is now 8 scenarios (those two pod-kills plus crash loop, image pull, OOM, failed probe, unschedulable). That 3/3 number is not the current catalog. Ablation (memory on) is compared with `--compare`.
 
 ### 3c. Alertmanager webhook (optional)
 
@@ -221,7 +234,7 @@ pip install -e ".[langgraph]"
 python -m agent_cli --engine langgraph "What is the status of frontend pods in citrus?"
 ```
 
-Same MCP tools, same gated writes, same evidence stamp — only the orchestration layer changes. The hand-written ReAct loop stays the default.
+Same MCP tools, same gated writes, same evidence stamp — only the orchestration layer changes. The hand-written ReAct loop stays the default. `--skill-routing auto` uses the same Skill runtime under both engines.
 
 ## Layout
 

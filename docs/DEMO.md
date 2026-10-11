@@ -48,7 +48,7 @@ kubectl delete -f infra/chaos/pod-kill-frontend.yaml
 
 ## E. Labeled eval
 
-Run the automated eval on 3 scenarios (healthy baseline + frontend kill + checkout kill):
+Run the automated eval (healthy baseline, two pod-kills, and stuck-pod fixtures):
 
 ```powershell
 # List scenarios (no cluster required)
@@ -57,7 +57,7 @@ python -m agent_cli.eval_rca --list
 # Dry run (does not execute)
 python -m agent_cli.eval_rca --dry-run
 
-# Full eval (needs cluster + Chaos Mesh + DEEPSEEK_API_KEY)
+# Full eval (needs cluster + DEEPSEEK_API_KEY; Chaos Mesh only for pod-kill)
 # First: no-memory baseline
 python -m agent_cli.eval_rca --all --no-memory
 

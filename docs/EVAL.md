@@ -1,15 +1,30 @@
 # RCA eval (hard-rule scorer)
 
-Three labeled scenarios. The scorer does **not** call an LLM. It checks whether
-the answer body contains the phrases in `eval_scenarios.py`.
+Eight labeled scenarios. The scorer does **not** call an LLM. It checks whether
+the answer body contains the phrases in `eval_scenarios.py`. Naming the workload
+is not enough: the fault word has to be one that is not already inside the workload name.
 
 | id | inject | what a hit means |
 |----|--------|------------------|
 | `healthy-baseline` | nothing | agent does **not** invent an incident |
-| `pod-kill-frontend` | existing PodChaos | names **frontend** + a kill/terminate verb |
-| `pod-kill-checkout` | new PodChaos | names **checkout** + a kill/terminate verb |
+| `pod-kill-frontend` | PodChaos | names **frontend** + a kill/terminate verb |
+| `pod-kill-checkout` | PodChaos | names **checkout** + a kill/terminate verb |
+| `crashloop-workload` | Deployment fixture | names **citrus-crashloop** + CrashLoopBackOff / backoff |
+| `imagepull-workload` | Deployment fixture | names **citrus-imagepull** + ImagePullBackOff / failed to pull |
+| `oomkilled-workload` | Deployment fixture | names **citrus-oom** + OOMKilled (a bare CrashLoopBackOff misses) |
+| `probe-not-ready` | Deployment fixture | names **citrus-probe** + readiness/liveness probe |
+| `pod-unschedulable` | Deployment fixture | names **citrus-unschedulable** + FailedScheduling / node selector |
 
-`healthy-baseline` is first on purpose so leftover kill events do not pollute it.
+`healthy-baseline` is first on purpose so leftover faults do not pollute it.
+Each later scenario deletes its manifest before the next one starts.
+
+The two pod-kills are one failure class on two services. The five fixtures are
+different classes, and they do not need Chaos Mesh. Network delay and CPU stress
+are still not in the catalog: a phrase score on an unpinned PromQL query would
+be noise.
+
+Stuck fixtures should `validate_recovery` **FAIL**. A kill that the ReplicaSet
+already replaced can **PASS**.
 
 ## Commands
 
@@ -19,13 +34,24 @@ cd components
 python -m agent_cli.eval_rca --list
 python -m agent_cli.eval_rca --dry-run
 
-# live (needs cluster + Chaos Mesh + DEEPSEEK_API_KEY)
+# live (needs cluster + DEEPSEEK_API_KEY; Chaos Mesh only for the two pod-kills)
 python -m agent_cli.eval_rca --all --no-memory   # freeze a baseline
 python -m agent_cli.eval_rca --all               # memory on (ablation)
 python -m agent_cli.eval_rca --compare ..\data\eval\baseline.json ..\data\eval\rca_eval_<stamp>.json
+
+# same model and step budget, two engines (langgraph needs the extra)
+python -m agent_cli.eval_rca --all --no-memory --engine react --max-steps 10
+python -m agent_cli.eval_rca --all --no-memory --engine langgraph --max-steps 10
+python -m agent_cli.eval_rca --compare ..\data\eval\rca_eval_<react>.json ..\data\eval\rca_eval_<langgraph>.json
+
+# Skill routing (same router as the CLI). Scenario ids / must_contain / manifests
+# are recording and inject labels only — they are not routing inputs.
+python -m agent_cli.eval_rca --all --no-memory --skill-routing auto --engine react --max-steps 10
 ```
 
-`--all` writes `data/eval/rca_eval_<timestamp>.json` (gitignored).
+`--all` writes `data/eval/rca_eval_<timestamp>.json` (gitignored). Each file records `engine`, `skill_routing`, `model_name`, `llm_provider`, `max_steps`, and per-scenario `duration_s`, `prompt_tokens`, and `completion_tokens`. `--compare` prints token deltas and says when the model, step budget, or skill routing mode does not match. `--engine` defaults to `react`. `--skill-routing` defaults to `legacy`. `phrase_hit` is still the legacy phrase matcher, not RCA accuracy and not skill-routing hit rate.
+
+Live `--all` still follows the existing fault-injection path (Chaos Mesh / `infra/faults/`). Offline `--list` / `--dry-run` / `--compare` do not.
 
 `--skip-inject` runs the agent against whatever is already in the cluster
 (useful if you already ran `.\infra\chaos\run-demo.ps1`).
@@ -33,6 +59,10 @@ python -m agent_cli.eval_rca --compare ..\data\eval\baseline.json ..\data\eval\r
 `--no-memory` is how the baseline was frozen: same agent, no JSONL hints.
 
 ## Frozen baseline (2026-08-13, DeepSeek, memory off)
+
+This baseline covers the original three scenarios only. The five stuck-pod
+fixtures were added later and have no live hit rate here. Do not quote 3/3 as
+the current catalog.
 
 | scenario | hit | evidence | duration_s | tool_calls |
 |----------|-----|----------|------------|------------|
@@ -119,5 +149,5 @@ Wrong-service stories fail (checkout scenario + frontend-only answer = miss).
 
 ```powershell
 cd components
-python -m pytest agent_cli/tests/test_eval_score.py agent_cli/tests/test_eval_compare.py -q
+python -m pytest agent_cli/tests/test_eval_score.py agent_cli/tests/test_eval_compare.py mcp-server/tests/test_pod_state.py -q
 ```
