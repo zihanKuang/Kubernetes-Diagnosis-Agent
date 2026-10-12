@@ -1,0 +1,173 @@
+{
+  "shared": {
+    "engine": "react",
+    "model_name": "deepseek-v4-flash",
+    "llm_provider": "deepseek",
+    "max_steps": 10,
+    "max_tool_calls": 40,
+    "max_retries": 3,
+    "llm_timeout_seconds": 120.0,
+    "tool_timeout_seconds": 60.0,
+    "llm_max_tokens": 8192,
+    "max_content_length": 4000,
+    "memory_enabled": false,
+    "writes_interactive": false,
+    "repeats_planned": 5,
+    "concurrency": 1,
+    "collected_at": "2026-03-15T12:00:00+00:00",
+    "window_start": "2026-03-15T11:50:00+00:00"
+  },
+  "win_rules": {
+    "composite_score": false,
+    "dimensions": [
+      "object_correct",
+      "facts",
+      "coverage",
+      "unsupported",
+      "recovery",
+      "advice",
+      "cost_time"
+    ],
+    "severe_never_offset_by_cost": true,
+    "phrase_hit_is_accuracy": false
+  },
+  "default_sre_fp": "9df85c6a314557acbd26ea31b29ef6c9e00ba7ed557ca4846a1321ce741d46fa",
+  "ablation_legacy_fp": "fb44342565e90d3374ddba08e03ef0f072fa19ae1188cbef8e7a612c396dc8f5",
+  "a_is_not_ablation": true,
+  "cases": {
+    "healthy-ready": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "909810536181ed2cce89828f65809512e9f54d95f91b74a9090936fdaafe7e86",
+      "query_fingerprint": "4e4fef737bd432db36ae22edcf34cdb7a7196a5211cabb282c270bb1576f5088",
+      "truth_fingerprint": "8782f75208fec7113010f2215bf76c2ef56a6d91b7cdb3429b7551c92c97c259"
+    },
+    "storefront-self-heal": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "048e8b9258b9b25f6e5e6c95eb0dd6ad331d25fec81de1aab3bdacbb14b599f1",
+      "query_fingerprint": "98fc91460a04389e1a16e655f8951e239ff5434320cbe00967c0222221ac30b7",
+      "truth_fingerprint": "a95736203c84677a804fdbb858d33a71f5f62c6b94d34d68ff48502edf4b9fda"
+    },
+    "crash-exit-unknown": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "605edef56a885f1802be14a406849033c0c05914a5af6d05ceff1f7a132e6f7b",
+      "query_fingerprint": "6fe57c61859f31526cd1f737ac99f1129bb914f4d91e98a2703d329d78b90da0",
+      "truth_fingerprint": "1932d8e84a9a2a89327db93a13b8a330e135991cf3dcd32f75b2065522b371e4"
+    },
+    "image-pull": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "b5310bd8e7eb7efe079d9c9b20ac3a0956d7d887f2e04fdcf472216049f4cff9",
+      "query_fingerprint": "9e313a0cef91b2cc5f932d063243d73e776ebcfa315fc36ef95f1414333c3391",
+      "truth_fingerprint": "67c28e0c5ccf306d2fddf995cb3d1e36f3a8c75b60db7ba4125bf8f0f5e42997"
+    },
+    "memory-kill": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "66fdb71298d239a1c0b072e49b0eebcf3022bd477f073c4af1254563925c08e7",
+      "query_fingerprint": "b49942448146e4fdf1eda9af09f3d6c8db0577dcbdb0287ac86dd077aac18072",
+      "truth_fingerprint": "96c23a3b2026e343d8dfc56fc7ca3a6f025e2f83fd2822a1e87def2f17dbef48"
+    },
+    "probe-unready": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "a593996c96e45b62961ad80ad28c00b894b44dd9a0a42b90c0599cada6555117",
+      "query_fingerprint": "94fcab486a61172d0ad93ac02f76f661fa2e2ba5ac32c8e63cb427b574d0e2c9",
+      "truth_fingerprint": "1aff64feb584bb49e0b031c887031a4dc3c970529fe845425c61ecfce81c1a3b"
+    },
+    "unschedulable": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "92ab4f3b917a2570a99d4f1e44131415e776e8acaa891a30256e4134e48d060b",
+      "query_fingerprint": "08f1aaac3ca281fade50e88d127f20162b6c33ffd5f8159b99965a0128bb6040",
+      "truth_fingerprint": "4cb84a298f94cff65f277d82637eed96f16c10353993dfea7d7b55aa0ed73fcc"
+    },
+    "mixed-stale-and-fresh": {
+      "split": "dev",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "8c4abdea19d9c512b01ffca974d7afa32905f547ae1879b4b150a1bb6459ec97",
+      "query_fingerprint": "29efd6be2c7edfe6f245376ca3ada90e75004550517df2aa4d997fb25bcbd5dc",
+      "truth_fingerprint": "a8d8f901fe8e77ccaf54b9898e0879c36741d2f6afc65d2020853954204f5b2f"
+    },
+    "checkout-self-heal": {
+      "split": "holdout",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "cdb105de36d05c7c42dd590c0cdd49fd4b07999b6a84971224a132a29d18ead8",
+      "query_fingerprint": "29efd6be2c7edfe6f245376ca3ada90e75004550517df2aa4d997fb25bcbd5dc",
+      "truth_fingerprint": "439bb047b0e6e1161f8b4960496038fea6687321050813f9d12352d0104d9e14"
+    },
+    "multi-fault": {
+      "split": "holdout",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "2c040e1096218ee5c254e22a38200d08ee0e35b7ec0c87b11e78ad5ccf76c2b0",
+      "query_fingerprint": "f44948482b79dfe701c3954558b6bab35e544a6d4ab8b99f01102289c89eb941",
+      "truth_fingerprint": "11eb156dc501b7ea462c0593cf70291cabcb928ea9e96f32772dbbb6b5fd2837"
+    },
+    "user-guessed-oom": {
+      "split": "holdout",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "d5f8362e519cc2f88ced8cb9d75b54521e241f398a57748675673664b443f814",
+      "query_fingerprint": "40f56b27b1471aeeb51726967cb4091540f729df63229a78e880a37c2a20de09",
+      "truth_fingerprint": "66ae9bd74d3f2d4e7d4339ea6a8dd856792940c9f5df20a31a0618e8aa9e4a11"
+    },
+    "scan-unavailable": {
+      "split": "holdout",
+      "kind": "synthetic",
+      "version": "1",
+      "fingerprint": "93d4340a02f835bb56786e629b1bdd87e5c4c8c89513b17734a3a098630d0421",
+      "query_fingerprint": "14f9d17e99b701f579c205d55c3529e781a02d07d59ede5fd9aada1dcf3cb52d",
+      "truth_fingerprint": "de528d19b266447d9d2ef069afb0d6d4de02d57ac6937a59ba697ffa23e79525"
+    }
+  },
+  "arms": {
+    "A": {
+      "arm": "A",
+      "label": "legacy",
+      "skill_routing": "legacy",
+      "system_instruction": "9df85c6a314557acbd26ea31b29ef6c9e00ba7ed557ca4846a1321ce741d46fa",
+      "instruction_dir": "",
+      "not_ablation_legacy_prompt": true
+    },
+    "B": {
+      "arm": "B",
+      "label": "own-skills",
+      "skill_routing": "auto",
+      "system_instruction": "9df85c6a314557acbd26ea31b29ef6c9e00ba7ed557ca4846a1321ce741d46fa",
+      "instruction_dir": "",
+      "not_ablation_legacy_prompt": true
+    },
+    "C": {
+      "arm": "C",
+      "label": "external-adapted",
+      "skill_routing": "auto",
+      "system_instruction": "9df85c6a314557acbd26ea31b29ef6c9e00ba7ed557ca4846a1321ce741d46fa",
+      "instruction_dir": "C:\\app\\Projects\\Citrus-Orchestrator\\components\\agent_cli\\skill_bench\\adapted_instructions",
+      "not_ablation_legacy_prompt": true,
+      "adapted_files": [
+        "crashloop:88458524480a9fbb6c423947bf04775d87a29cae177c03025c0e05c565cc60dd",
+        "generic-triage:21fd31a64384aafa5a6e4ff48ad091f13fb6a5c4a029c0b2ba54428d963fa010",
+        "healthy:e5254be781a51c75bdcc130e2ea0cb7c1cbfb29657ec519f02dbb90f47ed7a26",
+        "imagepull:03c9b0454c3e950b73bc1f590a9846e6f6ef28962af7dfb262052f46a7ea1a9d",
+        "oom:5047fabe4b72c77e37e45eaa789e7fb32274665f50f0bd37a6ff3cfb4f92a6aa",
+        "pod-lifecycle:d74ae4388b62516f9da519ca8572ab6ec52f5512076f71e38ac9e5c5a9674477",
+        "readiness:e14fb10917926891ca9b308cc99f13793be0b96dd65abef610089f6a54f3c81c",
+        "scheduling:935479e39268adf2e2754e27d071829099552185466a0ae0d0fb1b13b1dd011a",
+        "write-remediation:30b6a3d4914b61feebd91be1d6813d17d948e19cdf40fa98fd4784d7a2d54d97"
+      ]
+    }
+  },
+  "bundle": "c43118acbc87811e812e66df66501e47c70fe1192a8328bdd51e216f44e5a0b8"
+}

@@ -1,0 +1,7 @@
+"""Frozen exam clock. Replay must not use the machine's current time."""
+
+COLLECTED_AT = "2026-03-15T12:00:00+00:00"
+WINDOW_START = "2026-03-15T11:50:00+00:00"
+KILL_TIME = "2026-03-15T11:54:00+00:00"
+KILL_FIRST = "2026-03-15T11:54:00+00:00"
+STALE_TIME = "2026-03-15T11:20:00+00:00"
