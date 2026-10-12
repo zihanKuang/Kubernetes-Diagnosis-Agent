@@ -68,3 +68,5 @@ adjacency, alerts still processed. Not Neo4j.
 
 Webhook sessions set `writes_interactive=False`. `restart_deployment` /
 `scale_deployment` / `rollback_deployment` are denied even if the model proposes them.
+
+Alert labels (`service`, `alertname`, …) are routing clues when skill routing is `auto`. They are not a verified root cause and cannot authorize writes.

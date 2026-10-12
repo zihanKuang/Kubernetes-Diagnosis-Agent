@@ -14,8 +14,13 @@ kubectl get pods -n citrus
 cd components
 python -m agent_cli "What happened to frontend in citrus? RCA + validate_recovery."
 
-# or the labeled eval (3 scenarios, hard-rule score)
+# or the labeled eval (hard-rule score; pod-kills need Chaos Mesh,
+# infra/faults/ fixtures do not)
 python -m agent_cli.eval_rca --all
 ```
 
-See [docs/EVAL.md](../../docs/EVAL.md).
+See [docs/EVAL.md](../../docs/EVAL.md). Stuck-pod fixtures (crash loop, image pull, OOM, failed probe, unschedulable) live in `infra/faults/`. Delete every fixture with:
+
+```powershell
+kubectl delete deploy -n citrus -l citrus.dev/fault-fixture=true
+```

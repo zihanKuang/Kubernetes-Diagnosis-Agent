@@ -44,8 +44,6 @@ opentelemetry-collector:
   config:
     # Receivers: How services send data to the collector
     receivers:
-      kubeletstats:
-        insecure_skip_verify: true
       otlp:
         protocols:
           grpc:

@@ -27,5 +27,4 @@ See [docs/VLLM.md](../docs/VLLM.md).
 ## Related docs
 
 - [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md)
-- [docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)
 - [docs/README.md](../docs/README.md)
