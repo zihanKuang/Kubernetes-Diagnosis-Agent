@@ -10,4 +10,6 @@ Date: 2026-10-07
 - Live blockers: no paid authorization; upstream GitHub license is null so C is a Citrus-authored adaptation, not a redistributed original file.
 - Default CLI routing remains `legacy`.
 
-对照实验系统已准备并完成离线验证，尚不能判断 Skills 是否改善真实模型诊断表现。
+This file is the **2026-10-07 offline snapshot**. Live smoke + round-1 ran
+after it; do not quote `ok_live_quality=false` as the current experiment state.
+See [RESULTS.md](RESULTS.md).

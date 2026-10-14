@@ -1,6 +1,11 @@
 # Local demo
 
-Cluster must be running (`kubectl get ns citrus` works). If not, start Kubernetes first, then deploy.
+Cluster must be running (`kubectl get ns citrus` works). If not, start
+Kubernetes first, then deploy.
+
+Default agent routing is **legacy**. Citrus Skills are opt-in
+(`--skill-routing auto`). Do not present Skills as the production default;
+the replay bench kept legacy. See [skills/README.md](skills/README.md).
 
 ## A. Platform up
 
@@ -10,6 +15,8 @@ kubectl get pods -n citrus
 ```
 
 Expect otel-demo + monitoring pods Running (may take several minutes).
+`frontend-proxy` may CrashLoop on this cluster; the chaos demo targets
+**frontend**, not the proxy.
 
 ## B. Agent (stdio) smoke test
 
@@ -22,13 +29,28 @@ pip install -e "mcp-server[test]"
 # Configure agent_cli/.env (required):
 #   DEEPSEEK_API_KEY=sk-your-key-here
 
-# Smoke the agent
+# Smoke the agent (legacy routing)
 python -m agent_cli "List pods in citrus and summarize unhealthy ones."
 ```
 
-Expect: tool calls (`list_pods` / `get_pod_status` / …) then a short summary.
+Expect: tool calls (`list_pods` / `get_pod_status` / …) then a short summary,
+then an `Evidence check:` footer. `diagnosis: not_reviewed` is normal — the
+independent reviewer is not on the publish path.
+
+Offline Skill preview (no API key, no cluster tools):
+
+```powershell
+python -m agent_cli.skills list
+python -m agent_cli.skills preview --query "Is anything unhealthy in citrus?"
+```
 
 ## C. Chaos + RCA (main showcase)
+
+Keep a watch window open so the kill is visible (heal is often a few seconds):
+
+```powershell
+kubectl get pods -n citrus -l app.kubernetes.io/component=frontend -w
+```
 
 ```powershell
 # once per cluster
@@ -40,50 +62,51 @@ cd components
 python -m agent_cli "What just happened to the frontend pods in citrus? Short RCA, then validate_recovery."
 ```
 
+Optional Skills path (same chaos, same gates — staged tools + claims protocol):
+
+```powershell
+python -m agent_cli --skill-routing auto "What just happened to the frontend pods in citrus? Short RCA, then validate_recovery."
+```
+
 Cleanup (deletes the PodChaos resource in the cluster; the YAML file stays):
 
 ```powershell
 kubectl delete -f infra/chaos/pod-kill-frontend.yaml
 ```
 
-## E. Labeled eval
+Kubernetes recreates the pod. The agent diagnoses and checks Ready; it does
+not delete or restart pods under the default ServiceAccount.
 
-Run the automated eval (healthy baseline, two pod-kills, and stuck-pod fixtures):
+## D. Labeled eval (8 scenarios)
+
+Catalog: healthy baseline, two Chaos Mesh pod-kills, and five stuck-pod
+fixtures (crash loop, image pull, OOM, failed probe, unschedulable). Phrase
+hit means the answer named the labeled fault — not RCA accuracy.
 
 ```powershell
-# List scenarios (no cluster required)
+cd components
 python -m agent_cli.eval_rca --list
-
-# Dry run (does not execute)
 python -m agent_cli.eval_rca --dry-run
 
-# Full eval (needs cluster + DEEPSEEK_API_KEY; Chaos Mesh only for pod-kill)
-# First: no-memory baseline
+# live (needs cluster + DEEPSEEK_API_KEY; Chaos Mesh only for the two pod-kills)
 python -m agent_cli.eval_rca --all --no-memory
-
-# Second: memory on (agent reads postmortems)
-python -m agent_cli.eval_rca --all
-
-# Compare the two runs
-python -m agent_cli.eval_rca --compare data\eval\rca_eval_<timestamp1>.json data\eval\rca_eval_<timestamp2>.json
+python -m agent_cli.eval_rca --all --no-memory --skill-routing auto --engine react --max-steps 10
 ```
 
-Details: [EVAL.md](EVAL.md).
+Details: [EVAL.md](EVAL.md). Replay A/B/C (no live cluster):
+[skills/benchmark/README.md](skills/benchmark/README.md).
 
-## F. Webhook (Alertmanager)
+## E. Webhook (Alertmanager)
 
-Start the webhook HTTP server so Alertmanager can trigger RCA:
+Default listen port is **8088** (same as README / `CITRUS_WEBHOOK_PORT`).
 
 ```powershell
-# Option 1: env var
+cd components
 $env:CITRUS_WEBHOOK_TOKEN="change-me-webhook-secret"
-python -m agent_cli.webhook --port 9093
-
-# Option 2: flag
-python -m agent_cli.webhook --port 9093 --token "change-me-webhook-secret"
+python -m agent_cli.webhook --host 0.0.0.0 --port 8088
 
 # Exercise the webhook from another terminal
-curl -X POST http://localhost:9093/webhook `
+curl -X POST http://localhost:8088/webhook `
   -H "Authorization: Bearer change-me-webhook-secret" `
   -H "Content-Type: application/json" `
   -d '@infra/alerting/sample-alert.json'
@@ -92,11 +115,15 @@ curl -X POST http://localhost:9093/webhook `
 The webhook:
 
 - checks the token (idempotency + rate limit)
-- runs the agent for RCA
+- runs the agent for RCA (`CITRUS_SKILL_ROUTING=auto` uses the same router)
 - publishes only HIGH/MEDIUM evidence
+- records `diagnosis_status` / `recovery_status` on the card (usually
+  `not_reviewed`)
 - degrades by saving the raw payload if the agent fails
 
-## G. Optional HTTP MCP
+## F. Optional HTTP MCP
+
+Image tag in the manifests is **mcp-server:v4**.
 
 ```powershell
 cd components\mcp-server

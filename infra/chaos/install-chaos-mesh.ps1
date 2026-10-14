@@ -1,4 +1,4 @@
-# Install Chaos Mesh into the local cluster (Phase 5)
+# Install Chaos Mesh into the local cluster (once per cluster)
 # Usage: .\infra\chaos\install-chaos-mesh.ps1
 # Safe to re-run (helm upgrade --install).
 

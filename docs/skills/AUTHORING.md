@@ -1,5 +1,7 @@
 # Authoring Citrus Skills
 
+Operator overview and builtin list: [README.md](README.md). Workflow compose: [WORKFLOWS.md](WORKFLOWS.md).
+
 Citrus Skills are **this project's** diagnostic workflows. They are not Cursor or Codex personal skills. The agent only loads:
 
 - builtin packages under `components/agent_cli/skills/builtin/`

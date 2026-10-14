@@ -8,10 +8,10 @@ Chaos kill → K8s self-heal → Agent RCA + recovery validation
 
 ---
 
-Local Kubernetes platform for progressive delivery, observability, and Agentic SRE diagnostics.
+Local Kubernetes platform for observability and Agentic SRE diagnostics.
 
 Workload: [OpenTelemetry Demo](https://github.com/open-telemetry/opentelemetry-demo) (Helm).  
-Ops layer (this repo): monitoring stack, MCP server, hand-written ReAct agent CLI, Chaos Mesh demos.
+Ops layer (this repo): monitoring stack, MCP server, hand-written ReAct agent CLI (optional Skills), Chaos Mesh demos.
 
 ## What this repo is
 
@@ -20,7 +20,9 @@ Ops layer (this repo): monitoring stack, MCP server, hand-written ReAct agent CL
 | Target app | otel-demo microservices | `deploy/helm/otel-demo-values.yaml` |
 | Observability | Prometheus, Grafana, Jaeger + agent runtime `/metrics` | `deploy/helm/*`, `deploy/grafana/`, `components/agent_cli/metrics.py` |
 | MCP server | K8s/Prometheus tools over MCP | `components/mcp-server/` |
-| Agent CLI | hand-written ReAct loop + hard evidence stamp | `components/agent_cli/` |
+| Agent CLI | hand-written ReAct loop (default) or LangGraph, hard evidence stamp | `components/agent_cli/` |
+| Skills | opt-in staged diagnostic packages; default routing stays **legacy** | `components/agent_cli/skills/`, [docs/skills/README.md](docs/skills/README.md) |
+| Diagnosis | structured claims + observation ledger; independent reviewer is off the publish path | `components/agent_cli/diagnosis/`, `observations/`, `review/`, [docs/DIAGNOSIS.md](docs/DIAGNOSIS.md) |
 | Model serving | provider-agnostic `ModelClient` (DeepSeek hosted / self-hosted vLLM) | `components/agent_cli/llm_client.py`, `docs/VLLM.md` |
 | Chaos | PodChaos, stuck-pod fixtures, demo scripts | `infra/chaos/`, `infra/faults/` |
 | RBAC / deploy | least-privilege SA + manifests | `infra/rbac/`, `infra/manifests/` |
@@ -36,8 +38,10 @@ flowchart TB
     Input["User query / Alertmanager webhook"] --> Loop
 
     subgraph runtime ["Agent runtime (components/agent_cli)"]
-        Loop["Orchestration: hand-written ReAct loop (default) or LangGraph engine (--engine langgraph)"]
-        Harness["Deterministic harness (outside the model): gated writes + audit, evidence stamp, output truncation, postmortem memory"]
+        Loop["Orchestration: hand-written ReAct loop (default) or LangGraph (--engine langgraph)"]
+        Skills["Skill router (opt-in --skill-routing auto): scan → inspect → verify → synthesize"]
+        Harness["Deterministic harness: gated writes + audit, evidence stamp, claims publish, observation ledger, truncation, postmortem memory"]
+        Loop --- Skills
         Loop --- Harness
     end
 
@@ -60,6 +64,8 @@ flowchart TB
     Loop --> MC
     Loop --> MCP
 
+    Review["Independent claim reviewer (optional CITRUS_REVIEWER_*; not on the publish path)"]
+
     subgraph obs ["Observability"]
         Metrics["webhook GET /metrics (Prometheus format)"]
         Grafana["Grafana: citrus-agent-dashboard.json"]
@@ -68,9 +74,10 @@ flowchart TB
 
     MC -. "latency / tokens / failures" .-> Metrics
     Loop -. "tool calls / evidence level" .-> Metrics
+    Harness -. "run package" .-> Review
 ```
 
-## Evolution (V1 → V4)
+## Evolution (V1 → V5)
 
 The commit history follows a deliberate path, not a framework tutorial:
 
@@ -78,6 +85,7 @@ The commit history follows a deliberate path, not a framework tutorial:
 2. **V2 — harness, not loop.** Production problems turned out to live outside the loop: write-tool approval gates with audit logs, a deterministic evidence stamp computed from tool-call stats (never by the LLM), output truncation, postmortem memory, RCA eval with a frozen baseline.
 3. **V3 — orchestration as a swappable layer.** The same harness now runs under two engines: the hand-written ReAct loop (default) and a LangGraph `StateGraph` (`--engine langgraph`). The orchestration layer changed; gated writes, evidence, and eval did not.
 4. **V4 — model inference as a serving layer.** `LLMClient` became a provider-agnostic `ModelClient` with a concurrency semaphore, per-request timeout, and bounded retries. A `CITRUS_LLM_*` env switch points the same agent at hosted DeepSeek or a self-hosted vLLM endpoint, with inference latency / token / failure metrics scraped into Grafana. See [docs/VLLM.md](docs/VLLM.md).
+5. **V5 — packaged Skills + structured claims.** Builtin diagnostic packages (scan / inspect / verify / synthesize) are opt-in via `--skill-routing auto`. Claims must cite this run’s observation ids; invalid drafts are unpublished. An independent claim reviewer exists but is **not** wired into publish. A 180-diagnosis replay bench (legacy vs own-skills vs adapted text) did **not** switch the default off legacy. See [docs/skills/README.md](docs/skills/README.md) and [docs/DIAGNOSIS.md](docs/DIAGNOSIS.md).
 
 ## Design decisions & trade-offs
 
@@ -87,6 +95,8 @@ The commit history follows a deliberate path, not a framework tutorial:
 - **Reliability lives in the client, not the loop.** Timeout, retry with backoff+jitter, and a concurrency cap sit inside `ModelClient` / the tool executor. The ReAct loop only keeps a coarse circuit breaker (stop after repeated LLM errors), so orchestration stays readable.
 - **stdio by default, HTTP when shared.** Spawning MCP over stdio keeps the local loop zero-config and inherits the operator's kubeconfig; the in-cluster Streamable HTTP deployment adds Bearer auth, NetworkPolicy, and a namespace-scoped read-only ServiceAccount. Different trust boundaries, both explicit.
 - **Metrics are optional at import, mandatory in ops.** `prometheus_client` is an extra (`pip install -e ".[metrics]"`); without it every metric helper is a no-op, so the CLI path carries no extra dependency, while the long-lived webhook process exposes `/metrics` for Prometheus.
+- **Skills stay opt-in.** Routing, stage tools, and SKILL.md load only with `--skill-routing auto` / `--skill`. A live replay of 180 diagnoses (same model, 12 synthetic cases, 5 repeats) was mixed: Skills stopped better on scan-failure, added a false recovery, and every arm skipped inspect on self-heal. Default remains legacy. See [docs/skills/benchmark/RESULTS.md](docs/skills/benchmark/RESULTS.md).
+- **Claims are validated in code; review is a different process.** `publish_diagnosis` drops uncited free text. The evidence footer’s `diagnosis: not_reviewed` is honest: the optional reviewer uses separate credentials and cannot publish.
 
 ## Quick start
 
@@ -149,7 +159,7 @@ python -m agent_cli --skill crashloop --engine react "Why is citrus-crashloop un
 
 `--skill` locks the skill id (implies auto). It does not skip scan, evidence, tool permission, or write approval. `--engine react|langgraph` is independent of skill choice. See [docs/skills/AUTHORING.md](docs/skills/AUTHORING.md).
 
-The answer ends with an `Evidence check: HIGH|MEDIUM|LOW` footer. That stamp is computed from tool-call stats in code, not by the LLM. Zero tool calls is always LOW.
+The answer ends with an `Evidence check: HIGH|MEDIUM|LOW` footer (process stamp, not RCA verification). `diagnosis: not_reviewed` is the default — the independent reviewer is off the publish path. Zero tool calls is always LOW.
 
 `python -m agent_cli` needs those editable installs (`pip install -e`). A bare `pip install` of listed packages is not enough (you get `No module named mcp` / `agent_cli`).
 
@@ -176,6 +186,8 @@ See [docs/EVAL.md](docs/EVAL.md). Hit = the answer named the labeled fault. Evid
 
 Frozen baseline (2026-08-13, memory off, original 3 scenarios): **3/3 HIT**, all HIGH, ~8–14s. The catalog is now 8 scenarios (those two pod-kills plus crash loop, image pull, OOM, failed probe, unschedulable). That 3/3 number is not the current catalog. Ablation (memory on) is compared with `--compare`.
 
+Replay A/B/C (no Kubernetes): `python -m agent_cli.skill_bench`. Live round-1 kept **legacy** as default. [docs/skills/benchmark/RESULTS.md](docs/skills/benchmark/RESULTS.md).
+
 ### 3c. Alertmanager webhook (optional)
 
 ```powershell
@@ -184,7 +196,7 @@ $env:CITRUS_WEBHOOK_TOKEN="change-me"
 python -m agent_cli.webhook --host 0.0.0.0 --port 8088
 ```
 
-See [docs/WEBHOOK.md](docs/WEBHOOK.md). Card fields: suspected root cause, blast radius, suggested actions, evidence links. LOW evidence is not published as a root cause. If in-cluster Alertmanager cannot reach `host.docker.internal`, curl is the degrade path.
+See [docs/WEBHOOK.md](docs/WEBHOOK.md). Card fields: suspected root cause, blast radius, suggested actions, evidence links, `diagnosis_status`, `recovery_status`. LOW evidence is not published as a root cause. If in-cluster Alertmanager cannot reach `host.docker.internal`, curl is the degrade path. `CITRUS_SKILL_ROUTING=auto` uses the same Skill router; alert labels are routing clues, not a verified root cause.
 
 The same server exposes `GET /metrics` (Prometheus format: `citrus_llm_request_seconds`, `citrus_llm_tokens_total`, `citrus_llm_failures_total`, `citrus_tool_calls_total`, `citrus_agent_runs_total`). Install the extra with `pip install -e ".[metrics]"` and import `deploy/grafana/citrus-agent-dashboard.json` into Grafana.
 
@@ -241,7 +253,7 @@ Same MCP tools, same gated writes, same evidence stamp — only the orchestratio
 ```
 Citrus-Orchestrator/
 ├── components/                 # Python packages
-│   ├── agent_cli/              # ReAct + LangGraph, ModelClient, webhook, metrics
+│   ├── agent_cli/              # ReAct + LangGraph, Skills, diagnosis, review, skill_bench
 │   └── mcp-server/             # MCP tools (stdio / Streamable HTTP)
 ├── deploy/
 │   ├── helm/                   # monitoring, jaeger, otel-demo values
@@ -249,6 +261,7 @@ Citrus-Orchestrator/
 ├── infra/
 │   ├── alerting/               # PrometheusRule + sample Alertmanager payload
 │   ├── chaos/                  # Chaos Mesh install + PodChaos
+│   ├── faults/                 # stuck-pod eval fixtures
 │   ├── manifests/              # MCP Deployment / Service / NetworkPolicy
 │   └── rbac/                   # read-only Role for MCP SA
 ├── scripts/

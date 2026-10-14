@@ -27,11 +27,11 @@ kubectl get namespace citrus
 
 ```powershell
 cd components/mcp-server
-docker build -t mcp-server:v3 .
+docker build -t mcp-server:v4 .
 ```
 
 The tag matters: `infra/manifests/mcp-server-deployment.yaml` and
-`infra/manifests/rbac-test-pod.yaml` both hardcode `image: mcp-server:v3`.
+`infra/manifests/rbac-test-pod.yaml` both hardcode `image: mcp-server:v4`.
 If you build a different tag, update those two files too (or the Pod won't
 find your image and you'll get `ImagePullBackOff`).
 
@@ -55,12 +55,12 @@ No extra step — Docker Desktop shares its image cache with its own cluster.
 
 ### kind
 ```bash
-kind load docker-image mcp-server:v3
+kind load docker-image mcp-server:v4
 ```
 
 ### minikube
 ```bash
-minikube image load mcp-server:v3
+minikube image load mcp-server:v4
 ```
 
 **Verify image is loaded (kind/minikube):**
@@ -271,7 +271,7 @@ kubectl delete -f ../../infra/manifests/mcp-server-networkpolicy.yaml
 kubectl delete -f ../../infra/manifests/mcp-server-service.yaml
 kubectl delete -f ../../infra/manifests/mcp-server-secret.yaml
 kubectl delete -f ../../infra/rbac/mcp-server-rbac.yaml
-docker rmi mcp-server:v3
+docker rmi mcp-server:v4
 ```
 
 ---
@@ -282,9 +282,9 @@ docker rmi mcp-server:v3
 ```bash
 docker images | findstr mcp-server
 # kind:
-kind load docker-image mcp-server:v3
+kind load docker-image mcp-server:v4
 # minikube:
-minikube image load mcp-server:v3
+minikube image load mcp-server:v4
 ```
 
 ### Pod stuck in `CreateContainerConfigError`
@@ -324,4 +324,4 @@ is actually using `mcp-server-sa` (not the namespace's `default` SA).
 ## See also
 
 - [DEMO.md](DEMO.md) — the shorter chaos-injection + diagnosis walkthrough
-- [../README.md](../README.md) — quick start, layout, resume bullets
+- [../README.md](../README.md) — quick start, layout, design notes

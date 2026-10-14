@@ -260,10 +260,10 @@ kubectl delete namespace citrus
 
 ## Next Steps
 
-1. **Explore Dashboards:** Visit Grafana and import custom dashboards
-2. **Configure Alerts:** Set up Prometheus AlertManager
-3. **Deploy Custom Apps:** Use same infrastructure for your services
-4. **CI/CD Integration:** Add these scripts to GitHub Actions
+1. **Agent demo:** [DEMO.md](../../docs/DEMO.md) — chaos kill, RCA, optional Skills
+2. **Explore Dashboards:** Visit Grafana and import `deploy/grafana/citrus-agent-dashboard.json`
+3. **Configure Alerts:** [WEBHOOK.md](../../docs/WEBHOOK.md)
+4. **Labeled eval:** [EVAL.md](../../docs/EVAL.md)
 
 ## Related Documentation
 

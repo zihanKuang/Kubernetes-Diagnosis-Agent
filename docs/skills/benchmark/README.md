@@ -35,7 +35,9 @@ Live model calls are refused unless both flags are present:
 python -m agent_cli.skill_bench run --live --i-accept-model-charges --budget-diagnoses 9 --split dev --repeats 1 --cases healthy-ready,crash-exit-unknown,scan-unavailable
 ```
 
-That live command is implemented; it is **not** authorized by this session.
+Smoke (`--budget-diagnoses 9`) and round-1 (`--budget-diagnoses 180 --repeats 5`)
+already ran. See [RESULTS.md](RESULTS.md). Default `--skill-routing` remains
+**legacy**. Do not treat that round as a reason to switch production defaults.
 
 ## Scoring
 
@@ -44,6 +46,11 @@ unsupported claims, recovery claims, advice, plus tokens/time separately.
 There is no composite score that lets cheaper tokens cancel a misdiagnosis.
 `phrase_hit` is not accuracy.
 
-## If live eval has not run
+## Live round-1 (done)
 
-对照实验系统已准备并完成离线验证，尚不能判断 Skills 是否改善真实模型诊断表现。
+180 diagnoses, DeepSeek `deepseek-v4-flash`, replay tools only, memory off.
+Quality is mixed. Skills (B) stopped better on scan-failure and a bit better on
+scheduling / user-guessed probe; B added one false recovery; every arm skipped
+inspect on the self-heal family. Arm C matched B. Adoption decision: **keep A /
+legacy**. Full table: [RESULTS.md](RESULTS.md). Cluster inject is still not run
+([LIVE_CLUSTER.md](LIVE_CLUSTER.md)).

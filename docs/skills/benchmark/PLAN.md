@@ -1,4 +1,7 @@
-# Paid live plan (T065–T072) — not executed
+# Paid live plan (T065–T072) — executed
+
+Round-1 finished 180/180. Numbers and adoption decision: [RESULTS.md](RESULTS.md).
+This file is the plan that was used, not a new authorization.
 
 Shared conditions are in `agent_cli.skill_bench.conditions.SHARED`.
 Three arms use the same model, engine, step budget, retries, and exam clock.

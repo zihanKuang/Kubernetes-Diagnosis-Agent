@@ -58,6 +58,20 @@ Live `--all` still follows the existing fault-injection path (Chaos Mesh / `infr
 
 `--no-memory` is how the baseline was frozen: same agent, no JSONL hints.
 
+Each scored row also records `diagnosis_status` (usually `not_reviewed` — the
+independent reviewer is not on this path) and `recovery_status`. Those fields
+are not phrase_hit.
+
+## Replay bench (not this catalog)
+
+`python -m agent_cli.skill_bench` compares legacy vs Skills on **frozen
+synthetic observations**. It does not inject cluster faults. Live round-1
+(180 diagnoses, DeepSeek) kept `--skill-routing` **legacy** as the default.
+Do not quote those scores as this catalog’s hit rate.
+
+See [skills/benchmark/README.md](skills/benchmark/README.md) and
+[skills/benchmark/RESULTS.md](skills/benchmark/RESULTS.md).
+
 ## Frozen baseline (2026-08-13, DeepSeek, memory off)
 
 This baseline covers the original three scenarios only. The five stuck-pod
@@ -139,7 +153,8 @@ python -m agent_cli.eval_rca --all --no-memory --ablation legacy
 ## What the numbers mean
 
 - **root-cause hit**: phrase check on the answer *body* (the evidence footer is stripped).
-- **evidence HIGH/MEDIUM/LOW**: the Step-1 stamp from tool-call counts. Separate metric.
+- **evidence HIGH/MEDIUM/LOW**: the process stamp from tool-call counts. Separate metric.
+- **diagnosis_status**: semantic review of claims; live `eval_rca` leaves this `not_reviewed`.
 - **expected tools missing**: reported, does not flip the hit by itself.
 
 A hit is not “this is a good RCA”. It is “the agent named the labeled fault”.
@@ -150,4 +165,5 @@ Wrong-service stories fail (checkout scenario + frontend-only answer = miss).
 ```powershell
 cd components
 python -m pytest agent_cli/tests/test_eval_score.py agent_cli/tests/test_eval_compare.py mcp-server/tests/test_pod_state.py -q
+python -m agent_cli.skill_bench preflight
 ```

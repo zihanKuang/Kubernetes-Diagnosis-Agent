@@ -46,6 +46,8 @@ curl -s -X POST http://127.0.0.1:8088/webhook `
 | `blast_radius.one_hop_neighbors` | Jaeger adjacency, one hop (empty if Jaeger is down) |
 | `suggested_actions` | Rules: LOW → do not treat as RCA; otherwise inspect + propose gated writes (not executed) |
 | `evidence_links` | Tools that actually ran → kubectl / Prometheus UI hint. No fake PromQL permalinks |
+| `diagnosis_status` | Process field from the evidence stamp. Usually `not_reviewed` (reviewer is off this path) |
+| `recovery_status` | `pass` / `fail` / `unknown` from `validate_recovery`, not lasting SLI recovery |
 
 ## Gates
 
@@ -69,4 +71,4 @@ adjacency, alerts still processed. Not Neo4j.
 Webhook sessions set `writes_interactive=False`. `restart_deployment` /
 `scale_deployment` / `rollback_deployment` are denied even if the model proposes them.
 
-Alert labels (`service`, `alertname`, …) are routing clues when skill routing is `auto`. They are not a verified root cause and cannot authorize writes.
+Alert labels (`service`, `alertname`, …) are routing clues when skill routing is `auto` (`CITRUS_SKILL_ROUTING=auto` on the webhook process). They are not a verified root cause and cannot authorize writes. Default routing is still **legacy**.

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "citrus-agent-cli"
 version = "0.2.0"
-description = "Hand-written ReAct agent CLI (OpenAI-compatible tool calling: DeepSeek hosted or self-hosted vLLM) for Citrus MCP diagnostics."
+description = "Hand-written ReAct agent CLI with optional Citrus Skills and OpenAI-compatible ModelClient (DeepSeek hosted or self-hosted vLLM) for Citrus MCP diagnostics."
 requires-python = ">=3.12"
 dependencies = [
     "mcp>=1.0.0,<2",

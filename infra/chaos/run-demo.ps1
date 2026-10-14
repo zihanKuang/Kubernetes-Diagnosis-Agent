@@ -1,11 +1,11 @@
-# Phase 5 demo: inject PodChaos, then diagnose with Agent CLI
+# Chaos + agent demo: inject PodChaos, then diagnose with Agent CLI
 # Usage: .\infra\chaos\run-demo.ps1
 #
 # Flow:
 #   1. Snapshot frontend pods
 #   2. Apply PodChaos (kill one frontend pod)
 #   3. Wait for kill + ReplicaSet recreate
-#   4. Print the Agent CLI command for RCA + validate_recovery
+#   4. Print the Agent CLI command (legacy default; Skills are opt-in)
 
 param(
     [string]$Namespace = "citrus",
@@ -18,7 +18,7 @@ $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $ChaosManifest = Join-Path $PSScriptRoot "pod-kill-frontend.yaml"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Phase 5: Chaos + Agent Diagnosis Demo" -ForegroundColor Cyan
+Write-Host "Chaos + Agent Diagnosis Demo" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -72,6 +72,9 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "cd $($RepoRoot)\components" -ForegroundColor Gray
 Write-Host "python -m agent_cli `"What just happened to the frontend pods in citrus? Give a short RCA: check events, pod status, and validate recovery.`"" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Optional Skills routing (default is still legacy):" -ForegroundColor White
+Write-Host "  python -m agent_cli --skill-routing auto `"What just happened to the frontend pods in citrus? Short RCA, then validate_recovery.`"" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Or interactive:" -ForegroundColor White
 Write-Host "  cd components; python -m agent_cli -i" -ForegroundColor Yellow
