@@ -49,6 +49,12 @@ Webhook / eval use the same router when `CITRUS_SKILL_ROUTING=auto` or
 `--skill-routing auto`. Alert labels and scenario ids are not a verified root
 cause and cannot authorize writes.
 
+Live chaos self-heal is a weak Skills demo: after ReplicaSet replacement the
+current pod is Ready, auto can select `readiness` (or skip inspect) and deny
+`validate_recovery` until the verify stage. A 2026-10-15 run hit `max_steps`
+that way. Use `preview` or a stuck fixture, not the frontend kill, to show
+Skills on camera.
+
 ## Docs
 
 | File | What |

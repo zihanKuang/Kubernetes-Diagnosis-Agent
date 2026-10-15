@@ -1,7 +1,11 @@
 # Local demo
 
-Cluster must be running (`kubectl get ns citrus` works). If not, start
-Kubernetes first, then deploy.
+Verified live on 2026-10-15 (Docker Desktop Kubernetes, DeepSeek). Commands
+below ran; the caveats in section C are from that run, not theory.
+
+Cluster must be running (`kubectl get ns citrus` works). If Docker Desktop is
+stopped, start it and wait until `kubectl get nodes` shows Ready. Then deploy
+if the `citrus` namespace is missing.
 
 Default agent routing is **legacy**. Citrus Skills are opt-in
 (`--skill-routing auto`). Do not present Skills as the production default;
@@ -33,9 +37,10 @@ pip install -e "mcp-server[test]"
 python -m agent_cli "List pods in citrus and summarize unhealthy ones."
 ```
 
-Expect: tool calls (`list_pods` / `get_pod_status` / …) then a short summary,
-then an `Evidence check:` footer. `diagnosis: not_reviewed` is normal — the
-independent reviewer is not on the publish path.
+Expect: tool calls (`list_pods` / `get_pod_status` / …), then either a short
+summary or structured Facts/Symptoms claims, then an `Evidence check:` footer.
+`diagnosis: not_reviewed` is normal — the independent reviewer is not on the
+publish path. DeepSeek may return HTTP 503; `ModelClient` retries.
 
 Offline Skill preview (no API key, no cluster tools):
 
@@ -62,11 +67,22 @@ cd components
 python -m agent_cli "What just happened to the frontend pods in citrus? Short RCA, then validate_recovery."
 ```
 
-Optional Skills path (same chaos, same gates — staged tools + claims protocol):
+What actually happens on a good run:
 
-```powershell
-python -m agent_cli --skill-routing auto "What just happened to the frontend pods in citrus? Short RCA, then validate_recovery."
-```
+- `run-demo.ps1`: old frontend pod name disappears, a new name is Ready in ~25s
+  (2026-10-15: `…-68755` → `…-t9b47`).
+- Agent (legacy): `list_pods`, `get_recent_events`, `get_pod_status`,
+  `validate_recovery`. Logs contain Killing / SuccessfulCreate and a PASS.
+- **Published body may still say** `Diagnosis draft invalid; unreviewed free
+  text was not published` if a claim mixes restart/OOM/recovery. That is the
+  publisher, not a missed kill. Point at the tool log, not only the footer.
+- Footer: `Evidence check: HIGH`, `diagnosis: not_reviewed`, `recovery: pass`.
+
+Do **not** use `--skill-routing auto` as the camera money shot on this
+self-heal. A live 2026-10-15 auto run routed to `readiness`, denied
+`validate_recovery` six times (`not enabled for the current skill stage`), and
+hit `max_steps=10` with `recovery: unknown`. That matches the replay-bench
+self-heal gap. Keep auto for a separate Skills preview, not the chaos close.
 
 Cleanup (deletes the PodChaos resource in the cluster; the YAML file stays):
 

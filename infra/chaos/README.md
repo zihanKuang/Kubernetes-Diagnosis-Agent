@@ -14,8 +14,9 @@ kubectl get pods -n citrus
 cd components
 python -m agent_cli "What happened to frontend in citrus? RCA + validate_recovery."
 
-# optional Skills path — same gates; not the production default
-python -m agent_cli --skill-routing auto "What happened to frontend in citrus? RCA + validate_recovery."
+# Do not use --skill-routing auto as the chaos money shot: after ReplicaSet
+# heal, auto can pick readiness and deny validate_recovery until max_steps.
+# Preview skills offline instead: python -m agent_cli.skills preview --query "..."
 
 # or the labeled eval (hard-rule phrase score; pod-kills need Chaos Mesh,
 # infra/faults/ fixtures do not)
